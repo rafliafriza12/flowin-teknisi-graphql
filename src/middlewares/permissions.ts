@@ -1,13 +1,11 @@
-import { IRolePermissions } from "../models";
+import { RoleName } from "../models";
 
 /**
- * Permission types for GraphQL operations
+ * Permission types:
+ * - "public"        : No authentication required
+ * - RoleName[]      : Array of roles that are allowed (e.g. ["Admin", "Technician"])
  */
-export type PermissionType =
-  | "public" // No authentication required
-  | "authenticated" // Any authenticated user
-  | keyof IRolePermissions // Dynamic permission from role (readAllContent, writeAllContent, etc.)
-  | "superAdminOnly"; // Only Super Admin (system role)
+export type PermissionType = "public" | RoleName[];
 
 export interface RoutePermissions {
   Query: Record<string, PermissionType>;
@@ -15,55 +13,51 @@ export interface RoutePermissions {
 }
 
 /**
- * Dynamic permission mapping for GraphQL operations
- * Maps each operation to the required permission flag from IRolePermissions
+ * Permission mapping for every GraphQL operation.
+ * Use an array of allowed roles, or "public" for unauthenticated access.
  */
 export const permissions: RoutePermissions = {
   Query: {
-    // Authentication
-    me: "authenticated",
+    // Any authenticated role
+    me: ["Technician"],
 
-    // User Management - requires userManagement permission
-    users: "userManagement",
-    user: "userManagement",
-    usersByRole: "userManagement",
+    // Technician or Admin
+    user: ["Admin", "Technician"],
 
-    // Role Management - requires roleManagement permission
-    roles: "authenticated", // All authenticated users can see roles list (for UI)
-    role: "authenticated",
-    roleByName: "authenticated",
+    // Admin only
+    users: ["Admin"],
+    usersByRole: ["Admin"],
   },
 
   Mutation: {
-    // Authentication - public
+    // Public — no login required
     login: "public",
     refreshToken: "public",
-    logout: "authenticated",
-    changePassword: "authenticated",
     forgotPassword: "public",
     resetPassword: "public",
 
-    // User Management - requires userManagement permission
-    register: "public",
-    createUser: "userManagement",
-    updateUser: "public",
-    deleteUser: "userManagement",
-    toggleUserStatus: "userManagement",
+    // Any authenticated role
+    logout: ["Admin", "Technician", "User"],
+    changePassword: ["Admin", "Technician", "User"],
 
-    // Role Management - requires roleManagement permission
-    createRole: "roleManagement",
-    updateRole: "roleManagement",
-    deleteRole: "roleManagement",
-    initializeDefaultRoles: "superAdminOnly",
+    // Technician or Admin
+    updateUser: ["Admin", "Technician"],
+
+    // Admin only
+    register: ["Admin"],
+    createUser: ["Admin"],
+    deleteUser: ["Admin"],
+    toggleUserStatus: ["Admin"],
   },
 };
 
 /**
- * Get the permission type for a GraphQL operation
+ * Get the permission type for a GraphQL operation.
+ * Defaults to all authenticated roles if not explicitly mapped.
  */
 export const getPermission = (
   type: "Query" | "Mutation",
   operation: string,
 ): PermissionType => {
-  return permissions[type][operation] || "authenticated";
+  return permissions[type]?.[operation] ?? ["Admin", "Technician", "User"];
 };

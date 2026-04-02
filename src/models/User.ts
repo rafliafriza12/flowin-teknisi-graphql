@@ -5,12 +5,15 @@ import mongoose, {
 } from "mongoose";
 import bcrypt from "bcrypt";
 
+/**
+ * IUser — fields exposed via GraphQL.
+ * Role is NOT stored in MongoDB — it is embedded in the JWT only.
+ */
 export interface IUser {
   profilePictureUrl: string;
   fullname: string;
   username: string;
   email: string;
-  role: string;
   password: string;
   isActive: boolean;
   accessToken?: string;
@@ -18,7 +21,7 @@ export interface IUser {
   resetPasswordToken?: string;
   resetPasswordExpires?: Date;
   lastOnline?: Date;
-  cratedAt: Date;
+  createdAt: Date;
   updatedAt: Date;
 }
 
@@ -65,10 +68,6 @@ const userSchema = new Schema<IUserDocument>(
         message: "Email format is invalid",
       },
     },
-    role: {
-      type: String,
-      required: [true, "Role is required"],
-    },
     password: {
       type: String,
       required: [true, "Password is required"],
@@ -98,7 +97,7 @@ const userSchema = new Schema<IUserDocument>(
       default: null,
     },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 userSchema.pre<IUserDocument>("save", async function (this: IUserDocument) {
@@ -108,7 +107,7 @@ userSchema.pre<IUserDocument>("save", async function (this: IUserDocument) {
 
   if (!regex.test(this.password)) {
     throw new Error(
-      "Password must be at least 8 characters long, contain 1 uppercase letter, and 1 special character."
+      "Password must be at least 8 characters long, contain 1 uppercase letter, and 1 special character.",
     );
   }
 
@@ -117,27 +116,3 @@ userSchema.pre<IUserDocument>("save", async function (this: IUserDocument) {
 });
 
 export const User = mongoose.model<IUserDocument>("User", userSchema);
-
-// Settings for dynamic user roles
-export interface IUserSettings {
-  roles: string[];
-}
-
-export interface IUserSettingsDocument extends IUserSettings, Document {}
-
-const userSettingsSchema = new Schema<IUserSettingsDocument>(
-  {
-    roles: {
-      type: [String],
-      default: ["Super Admin", "Admin", "Copywriter"],
-    },
-  },
-  {
-    timestamps: true,
-  }
-);
-
-export const UserSettings = mongoose.model<IUserSettingsDocument>(
-  "UserSettings",
-  userSettingsSchema
-);

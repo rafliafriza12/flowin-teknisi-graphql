@@ -1,34 +1,26 @@
 import { Request, Response } from "express";
 import { IUserDocument } from "../models";
+import { RoleName } from "../models";
 
-// UserRole is now dynamic (stored in database), so we use string type
-export type UserRole = string;
-
-// Localized string type for multi-language support
-export interface ILocalizedString {
-  en: string;
-  id: string;
-}
-
-// Helper type for optional localized fields
-export interface ILocalizedStringOptional {
-  en?: string;
-  id?: string;
-}
-
-export type PermissionLevel = "public" | "authenticated" | string[];
+export type { RoleName };
 
 export interface JwtPayload {
   userId: string;
   email: string;
-  role: string;
+  role: RoleName;
   type: "access" | "refresh";
 }
 
+/**
+ * GraphQL context — user is populated from JWT by authMiddleware.
+ * Note: IUserDocument does NOT have a role field; role lives in the JWT only.
+ * The resolved role is stored separately here.
+ */
 export interface GraphQLContext {
   req: Request;
   res: Response;
   user?: IUserDocument | null;
+  role?: RoleName | null;
 }
 
 export interface PaginationInput {

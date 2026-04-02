@@ -3,10 +3,6 @@ import { handleError } from "../../utils/errors";
 import services from "../../services";
 import { CreateUserInput, UpdateUserInput } from "../../services/userService";
 
-interface GetByRoleArgs {
-  role: string;
-}
-
 interface CreateUserArgs {
   input: {
     profilePictureUrl: string;
@@ -14,7 +10,6 @@ interface CreateUserArgs {
     username: string;
     email: string;
     password: string;
-    role: string;
   };
 }
 
@@ -25,7 +20,6 @@ interface UpdateUserArgs {
     fullname?: string;
     username?: string;
     email?: string;
-    role?: string;
     isActive?: boolean;
     password?: string;
   };
@@ -48,25 +42,12 @@ const userResolver = {
         throw handleError(error, "Resolver.user");
       }
     },
-
-    usersByRole: async (_: unknown, args: GetByRoleArgs) => {
-      try {
-        const role = args.role.replace(/_/g, " ") as "Super Admin" | "Admin" | "Copywriter";
-        return await services.userService.getUsersByRole(role);
-      } catch (error) {
-        throw handleError(error, "Resolver.usersByRole");
-      }
-    },
   },
 
   Mutation: {
     createUser: async (_: unknown, args: CreateUserArgs) => {
       try {
-        const input: CreateUserInput = {
-          ...args.input,
-          role: args.input.role.replace(/_/g, " ") as "Super Admin" | "Admin" | "Copywriter"
-        };
-        return await services.userService.createUser(input);
+        return await services.userService.createUser(args.input);
       } catch (error) {
         throw handleError(error, "Resolver.createUser");
       }
@@ -74,19 +55,7 @@ const userResolver = {
 
     updateUser: async (_: unknown, args: UpdateUserArgs) => {
       try {
-        let input: UpdateUserInput;
-        
-        if (args.input.role) {
-          input = {
-            ...args.input,
-            role: args.input.role.replace(/_/g, " ") as "Super Admin" | "Admin" | "Copywriter"
-          };
-        } else {
-          const { role, ...rest } = args.input;
-          input = rest;
-        }
-        
-        return await services.userService.updateUser(args.id, input);
+        return await services.userService.updateUser(args.id, args.input);
       } catch (error) {
         throw handleError(error, "Resolver.updateUser");
       }
@@ -119,10 +88,7 @@ const userResolver = {
   },
 
   User: {
-    id: (parent: { _id: { toString(): string } }) => {
-      return parent._id.toString();
-    },
-    // Role is returned as-is from database (no transformation)
+    id: (parent: { _id: { toString(): string } }) => parent._id.toString(),
   },
 };
 

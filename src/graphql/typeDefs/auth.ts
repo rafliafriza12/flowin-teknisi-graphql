@@ -5,16 +5,10 @@ const authTypeDefs = `#graphql
         fullname: String!
         username: String!
         email: String!
-        role: String!
         isActive: Boolean!
         lastOnline: String
         createdAt: String!
         updatedAt: String!
-    }
-
-    type UserSettings {
-        id: ID!
-        roles: [String!]!
     }
 
     type TokenPair {
@@ -53,7 +47,6 @@ const authTypeDefs = `#graphql
         username: String!
         email: String!
         password: String!
-        role: String!
     }
 
     input ChangePasswordInput {
@@ -82,19 +75,16 @@ const authTypeDefs = `#graphql
 
     type Query {
         me: User
-        userSettings: UserSettings!
     }
 
     type Mutation {
         login(input: LoginInput!): AuthResponse!
         register(input: RegisterInput!): AuthResponse!
         refreshToken(refreshToken: String!): RefreshTokenResponse!
-        logout: LogoutResponse!    
+        logout: LogoutResponse!
         changePassword(input: ChangePasswordInput!): ChangePasswordResponse!
         forgotPassword(input: ForgotPasswordInput!): ForgotPasswordResponse!
         resetPassword(input: ResetPasswordInput!): ResetPasswordResponse!
-        addUserRole(role: String!): UserSettings!
-        removeUserRole(role: String!): UserSettings!
     }
 `;
 

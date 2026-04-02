@@ -1,13 +1,10 @@
 const userTypeDefs = `#graphql
-    # User sudah didefinisikan di auth.ts, extend saja
-
     input CreateUserInput {
         profilePictureUrl: String!
         fullname: String!
         username: String!
         email: String!
         password: String!
-        role: String!
     }
 
     input UpdateUserInput {
@@ -15,7 +12,6 @@ const userTypeDefs = `#graphql
         fullname: String
         username: String
         email: String
-        role: String
         password: String
         isActive: Boolean
     }
@@ -31,13 +27,12 @@ const userTypeDefs = `#graphql
         message: String!
     }
 
-    type Query {
+    extend type Query {
         users: [User!]!
         user(id: ID!): User
-        usersByRole(role: String!): [User!]!
     }
 
-    type Mutation {
+    extend type Mutation {
         createUser(input: CreateUserInput!): User!
         updateUser(id: ID!, input: UpdateUserInput!): User
         deleteUser(id: ID!): DeleteUserResponse!

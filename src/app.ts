@@ -29,7 +29,7 @@ const createExpressMiddleware = <TContext extends GraphQLContext>(
   server: ApolloServer<TContext>,
   options?: {
     context?: (args: { req: Request; res: Response }) => Promise<TContext>;
-  }
+  },
 ) => {
   return async (req: Request, res: Response) => {
     const contextValue = options?.context
@@ -45,7 +45,7 @@ const createExpressMiddleware = <TContext extends GraphQLContext>(
           variables: body.variables,
           operationName: body.operationName,
         },
-        { contextValue }
+        { contextValue },
       );
 
       if (result.body.kind === "single") {
@@ -79,7 +79,7 @@ export const startApolloServer = async () => {
       methods: ["GET", "POST", "OPTIONS"],
       allowedHeaders: ["Content-Type", "Authorization", "x-api-key"],
       credentials: true,
-    })
+    }),
   );
 
   app.use(json());
@@ -98,14 +98,8 @@ export const startApolloServer = async () => {
 
   const graphqlMiddleware = createExpressMiddleware(apolloServer, {
     context: async ({ req, res }): Promise<GraphQLContext> => {
-      // Authenticate user from token
-      const user = await authMiddleware(req);
-
-      return {
-        req,
-        res,
-        user,
-      };
+      const { user, role } = await authMiddleware(req);
+      return { req, res, user, role };
     },
   });
 

@@ -1,5 +1,10 @@
-import { User, IUserDocument, UserSettings, IUserSettingsDocument } from "../models";
-import { notFoundError, conflictError, handleError, validateId } from "../utils/errors";
+import { User, IUserDocument } from "../models";
+import {
+  notFoundError,
+  conflictError,
+  handleError,
+  validateId,
+} from "../utils/errors";
 
 export interface CreateUserInput {
   profilePictureUrl: string;
@@ -7,7 +12,6 @@ export interface CreateUserInput {
   username: string;
   email: string;
   password: string;
-  role: string;
 }
 
 export interface UpdateUserInput {
@@ -15,7 +19,6 @@ export interface UpdateUserInput {
   fullname?: string;
   username?: string;
   email?: string;
-  role?: string;
   password?: string;
   isActive?: boolean;
 }
@@ -36,7 +39,7 @@ const userService = {
 
     try {
       const user = await User.findById(id).select(
-        "-password -accessToken -refreshToken"
+        "-password -accessToken -refreshToken",
       );
       if (!user) {
         throw notFoundError(`User dengan ID ${id} tidak ditemukan`, "User");
@@ -71,7 +74,7 @@ const userService = {
       await user.save();
 
       const savedUser = await User.findById(user._id).select(
-        "-password -accessToken -refreshToken"
+        "-password -accessToken -refreshToken",
       );
       return savedUser!;
     } catch (error) {
@@ -79,7 +82,10 @@ const userService = {
     }
   },
 
-  updateUser: async (id: string, input: UpdateUserInput): Promise<IUserDocument> => {
+  updateUser: async (
+    id: string,
+    input: UpdateUserInput,
+  ): Promise<IUserDocument> => {
     validateId(id);
 
     try {
@@ -89,7 +95,10 @@ const userService = {
           _id: { $ne: id },
         });
         if (existingEmail) {
-          throw conflictError("Email already registered by another user", "email");
+          throw conflictError(
+            "Email already registered by another user",
+            "email",
+          );
         }
       }
 
@@ -99,7 +108,10 @@ const userService = {
           _id: { $ne: id },
         });
         if (existingUsername) {
-          throw conflictError("Username already taken by another user", "username");
+          throw conflictError(
+            "Username already taken by another user",
+            "username",
+          );
         }
       }
 
@@ -145,79 +157,11 @@ const userService = {
       await user.save();
 
       const updatedUser = await User.findById(id).select(
-        "-password -accessToken -refreshToken"
+        "-password -accessToken -refreshToken",
       );
       return updatedUser!;
     } catch (error) {
       throw handleError(error, "UserService.toggleStatus");
-    }
-  },
-
-  getUsersByRole: async (role: string): Promise<IUserDocument[]> => {
-    try {
-      return await User.find({ role })
-        .select("-password -accessToken -refreshToken")
-        .sort({ createdAt: -1 });
-    } catch (error) {
-      throw handleError(error, "UserService.getByRole");
-    }
-  },
-
-  // Settings methods
-  getSettings: async (): Promise<IUserSettingsDocument> => {
-    try {
-      let settings = await UserSettings.findOne();
-      
-      if (!settings) {
-        settings = new UserSettings({
-          roles: ["Super Admin", "Admin", "Copywriter"],
-        });
-        await settings.save();
-      } else if (!settings.roles || settings.roles.length === 0) {
-        // Handle case where settings exists but roles is empty
-        settings.roles = ["Super Admin", "Admin", "Copywriter"];
-        await settings.save();
-      }
-      
-      return settings;
-    } catch (error) {
-      throw handleError(error, "UserService.getSettings");
-    }
-  },
-
-  addRole: async (role: string): Promise<IUserSettingsDocument> => {
-    try {
-      let settings = await UserSettings.findOne();
-      
-      if (!settings) {
-        settings = new UserSettings({
-          roles: ["Super Admin", "Admin", "Copywriter", role],
-        });
-      } else {
-        if (!settings.roles.includes(role)) {
-          settings.roles.push(role);
-        }
-      }
-      
-      return await settings.save();
-    } catch (error) {
-      throw handleError(error, "UserService.addRole");
-    }
-  },
-
-  removeRole: async (role: string): Promise<IUserSettingsDocument> => {
-    try {
-      const settings = await UserSettings.findOne();
-      
-      if (!settings) {
-        throw notFoundError("UserSettings tidak ditemukan", "UserSettings");
-      }
-      
-      settings.roles = settings.roles.filter((r) => r !== role);
-      
-      return await settings.save();
-    } catch (error) {
-      throw handleError(error, "UserService.removeRole");
     }
   },
 };

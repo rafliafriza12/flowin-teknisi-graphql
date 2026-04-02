@@ -1,5 +1,5 @@
 import { GraphQLContext } from "../types";
-import { IUserDocument, Role, IRolePermissions } from "../models";
+import { IUserDocument, RoleName } from "../models";
 import { authenticationError, forbiddenError } from "../utils/errors";
 import { getPermission, PermissionType } from "./permissions";
 
@@ -7,7 +7,7 @@ type ResolverFunction = (
   parent: unknown,
   args: unknown,
   context: GraphQLContext,
-  info: unknown
+  info: unknown,
 ) => unknown;
 
 type ResolverMap = Record<string, ResolverFunction>;
@@ -18,158 +18,163 @@ interface Resolvers {
   [key: string]: unknown;
 }
 
-// Cache for role permissions to avoid repeated database queries
-const rolePermissionsCache = new Map<string, { permissions: IRolePermissions; timestamp: number }>();
-const CACHE_TTL = 60 * 1000; // 1 minute cache TTL
+// ─── Role middleware (guard) functions ─────────────────────────────────────────
+// Setiap middleware bertugas memvalidasi context untuk role tertentu.
+// Kamu bisa tambahkan logic database validation di sini nanti.
 
 /**
- * Get role permissions from cache or database
+ * Middleware: validasi bahwa context memiliki role "Admin".
+ * Tambahkan logic DB validation di sini sesuai kebutuhan.
  */
-const getRolePermissions = async (roleName: string): Promise<IRolePermissions | null> => {
-  const now = Date.now();
-  const cached = rolePermissionsCache.get(roleName);
-  
-  if (cached && (now - cached.timestamp) < CACHE_TTL) {
-    return cached.permissions;
+export const isAdmin = async (context: GraphQLContext): Promise<void> => {
+  if (!context.user || !context.role) {
+    throw authenticationError("Authentication required. Please login.");
   }
-  
-  const role = await Role.findOne({ name: roleName });
-  if (!role) {
-    return null;
+  if (context.role !== "Admin") {
+    throw forbiddenError("Access denied.");
   }
-  
-  rolePermissionsCache.set(roleName, {
-    permissions: role.permissions,
-    timestamp: now,
-  });
-  
-  return role.permissions;
 };
 
 /**
- * Check if a role is "Super Admin" (special system role with all permissions)
+ * Middleware: validasi bahwa context memiliki role "Technician".
+ * Tambahkan logic DB validation di sini sesuai kebutuhan.
  */
-const isSuperAdmin = (roleName: string): boolean => {
-  return roleName === "Super Admin";
+export const isTechnician = async (context: GraphQLContext): Promise<void> => {
+  if (!context.user || !context.role) {
+    throw authenticationError("Authentication required. Please login.");
+  }
+  if (context.role !== "Technician") {
+    throw forbiddenError("Access denied.");
+  }
 };
 
 /**
- * Check if user has the required permission
+ * Middleware: validasi bahwa context memiliki role "User".
+ * Tambahkan logic DB validation di sini sesuai kebutuhan.
  */
-const checkPermission = async (
+export const isUser = async (context: GraphQLContext): Promise<void> => {
+  if (!context.user || !context.role) {
+    throw authenticationError("Authentication required. Please login.");
+  }
+  if (context.role !== "User") {
+    throw forbiddenError("Access denied.");
+  }
+};
+
+/**
+ * Middleware: validasi bahwa user sudah login (role apapun).
+ * Tambahkan logic DB validation di sini sesuai kebutuhan.
+ */
+export const requireAuth = async (context: GraphQLContext): Promise<void> => {
+  if (!context.user || !context.role) {
+    throw authenticationError("Authentication required. Please login.");
+  }
+};
+
+// ─── Mapping: RoleName → middleware function ──────────────────────────────────
+
+const roleMiddlewareMap: Record<
+  RoleName,
+  (context: GraphQLContext) => Promise<void>
+> = {
+  Admin: isAdmin,
+  Technician: isTechnician,
+  User: isUser,
+};
+
+// ─── Core permission check ────────────────────────────────────────────────────
+
+/**
+ * Inti pengecekan permission — dipanggil otomatis oleh wrapResolver.
+ *
+ * Alur:
+ * 1. "public"     → langsung lolos, tidak butuh login
+ * 2. RoleName[]   → harus login, lalu panggil middleware yang sesuai
+ *                    berdasarkan role user dari JWT.
+ *
+ * checkPermission akan memanggil isAdmin() / isTechnician() / isUser()
+ * secara otomatis. Di middleware itulah kamu bisa taruh validasi DB.
+ */
+export const checkPermission = async (
   context: GraphQLContext,
   permission: PermissionType,
-  operationName: string
 ): Promise<IUserDocument | null> => {
-  // Public endpoints - no authentication required
+  // Public route — tidak butuh login
   if (permission === "public") {
-    return context.user || null;
+    return context.user ?? null;
   }
 
-  // All other permissions require authentication
-  if (!context.user) {
+  // Harus login
+  if (!context.user || !context.role) {
     throw authenticationError("Authentication required. Please login.");
   }
 
-  // Just authenticated - any logged in user
-  if (permission === "authenticated") {
-    return context.user;
+  // Cek apakah role user ada di daftar role yang diizinkan
+  if (!permission.includes(context.role)) {
+    throw forbiddenError(`Access denied.`);
   }
 
-  const userRole = context.user.role;
-
-  // Super Admin only - special case
-  if (permission === "superAdminOnly") {
-    if (!isSuperAdmin(userRole)) {
-      throw forbiddenError(
-        `Access denied. This operation requires Super Admin privileges.`
-      );
-    }
-    return context.user;
-  }
-
-  // Super Admin has all permissions
-  if (isSuperAdmin(userRole)) {
-    return context.user;
-  }
-
-  // Get role permissions from database
-  const rolePermissions = await getRolePermissions(userRole);
-  
-  if (!rolePermissions) {
-    throw forbiddenError(
-      `Access denied. Role "${userRole}" not found.`
-    );
-  }
-
-  // Check if the permission key exists and is true
-  const permissionKey = permission as keyof IRolePermissions;
-  if (!rolePermissions[permissionKey]) {
-    throw forbiddenError(
-      `Access denied. You don't have "${permissionKey}" permission for this operation.`
-    );
+  //  Panggil middleware sesuai role user untuk validasi lebih lanjut (DB, dll)
+  const middleware = roleMiddlewareMap[context.role];
+  if (middleware) {
+    await middleware(context);
   }
 
   return context.user;
 };
 
-/**
- * Wrap a resolver with permission checking
- */
+// ─── Utility helpers (tanpa throw, untuk conditional logic di resolver) ───────
+
+/** Cek role tanpa throw — untuk conditional logic di dalam resolver. */
+export const hasRole = (context: GraphQLContext, role: RoleName): boolean => {
+  return context.role === role;
+};
+
+/** Cek apakah role ada di list — untuk conditional logic. */
+export const hasAnyRole = (
+  context: GraphQLContext,
+  roles: RoleName[],
+): boolean => {
+  return !!context.role && roles.includes(context.role);
+};
+
+// ─── Resolver wrapper ─────────────────────────────────────────────────────────
+
 const wrapResolver = (
   resolver: ResolverFunction,
   type: "Query" | "Mutation",
-  operationName: string
+  operationName: string,
 ): ResolverFunction => {
   return async (parent, args, context, info) => {
     const permission = getPermission(type, operationName);
-    await checkPermission(context, permission, operationName);
+    await checkPermission(context, permission);
     return resolver(parent, args, context, info);
   };
 };
 
-/**
- * Wrap all resolvers in a map with permission checking
- */
 const wrapResolverMap = (
   resolvers: ResolverMap | undefined,
-  type: "Query" | "Mutation"
+  type: "Query" | "Mutation",
 ): ResolverMap => {
   if (!resolvers) return {};
-
   const wrapped: ResolverMap = {};
-
   for (const [operationName, resolver] of Object.entries(resolvers)) {
     wrapped[operationName] = wrapResolver(resolver, type, operationName);
   }
-
   return wrapped;
 };
 
 /**
- * Apply permission middleware to all resolvers
+ * Wrap semua resolver dengan pengecekan permission otomatis
+ * berdasarkan mapping di `permissions.ts`.
  */
 export const withPermissions = (resolvers: Resolvers): Resolvers => {
   const result: Resolvers = { ...resolvers };
-
-  if (resolvers.Query) {
-    result.Query = wrapResolverMap(resolvers.Query, "Query");
-  }
-
-  if (resolvers.Mutation) {
+  if (resolvers.Query) result.Query = wrapResolverMap(resolvers.Query, "Query");
+  if (resolvers.Mutation)
     result.Mutation = wrapResolverMap(resolvers.Mutation, "Mutation");
-  }
-
   return result;
 };
 
-/**
- * Clear the role permissions cache (call when roles are updated)
- */
-export const clearRolePermissionsCache = (roleName?: string): void => {
-  if (roleName) {
-    rolePermissionsCache.delete(roleName);
-  } else {
-    rolePermissionsCache.clear();
-  }
-};
+/** No-op — kept for backward compatibility. */
+export const clearRolePermissionsCache = (_roleName?: string): void => {};

@@ -16,7 +16,6 @@ interface RegisterArgs {
     username: string;
     email: string;
     password: string;
-    role: string;
   };
 }
 
@@ -44,14 +43,6 @@ interface ResetPasswordArgs {
   };
 }
 
-interface AddRoleArgs {
-  role: string;
-}
-
-interface RemoveRoleArgs {
-  role: string;
-}
-
 const authResolver = {
   Query: {
     me: async (_: unknown, __: unknown, context: GraphQLContext) => {
@@ -59,17 +50,11 @@ const authResolver = {
         if (!context.user) {
           return null;
         }
-        return await services.authService.getCurrentUser(context.user._id.toString());
+        return await services.authService.getCurrentUser(
+          context.user._id.toString(),
+        );
       } catch (error) {
         throw handleError(error, "Resolver.me");
-      }
-    },
-
-    userSettings: async () => {
-      try {
-        return await services.userService.getSettings();
-      } catch (error) {
-        throw handleError(error, "Resolver.userSettings");
       }
     },
   },
@@ -86,10 +71,9 @@ const authResolver = {
 
     register: async (_: unknown, args: RegisterArgs) => {
       try {
-        const input = {
-          ...args.input,
-        };
-        const { user, tokens } = await services.authService.register(input);
+        const { user, tokens } = await services.authService.register(
+          args.input,
+        );
         return { user, tokens };
       } catch (error) {
         throw handleError(error, "Resolver.register");
@@ -122,7 +106,7 @@ const authResolver = {
     changePassword: async (
       _: unknown,
       args: ChangePasswordArgs,
-      context: GraphQLContext
+      context: GraphQLContext,
     ) => {
       try {
         if (!context.user) {
@@ -131,7 +115,7 @@ const authResolver = {
         await services.authService.changePassword(
           context.user._id.toString(),
           args.input.oldPassword,
-          args.input.newPassword
+          args.input.newPassword,
         );
         return {
           success: true,
@@ -147,7 +131,8 @@ const authResolver = {
         await services.authService.forgotPassword(args.input.email);
         return {
           success: true,
-          message: "If an account with that email exists, a password reset link has been sent.",
+          message:
+            "If an account with that email exists, a password reset link has been sent.",
         };
       } catch (error) {
         throw handleError(error, "Resolver.forgotPassword");
@@ -158,41 +143,20 @@ const authResolver = {
       try {
         await services.authService.resetPassword(
           args.input.token,
-          args.input.newPassword
+          args.input.newPassword,
         );
         return {
           success: true,
-          message: "Password has been reset successfully. You can now sign in with your new password.",
+          message:
+            "Password has been reset successfully. You can now sign in with your new password.",
         };
       } catch (error) {
         throw handleError(error, "Resolver.resetPassword");
       }
     },
-
-    addUserRole: async (_: unknown, args: AddRoleArgs) => {
-      try {
-        return await services.userService.addRole(args.role);
-      } catch (error) {
-        throw handleError(error, "Resolver.addUserRole");
-      }
-    },
-
-    removeUserRole: async (_: unknown, args: RemoveRoleArgs) => {
-      try {
-        return await services.userService.removeRole(args.role);
-      } catch (error) {
-        throw handleError(error, "Resolver.removeUserRole");
-      }
-    },
   },
 
   User: {
-    id: (parent: { _id: { toString(): string } }) => {
-      return parent._id.toString();
-    },
-  },
-
-  UserSettings: {
     id: (parent: { _id: { toString(): string } }) => {
       return parent._id.toString();
     },

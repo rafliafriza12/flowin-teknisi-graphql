@@ -24,7 +24,6 @@ interface RegisterInput {
   username: string;
   email: string;
   password: string;
-  role: string;
 }
 
 interface TokenPair {
@@ -42,7 +41,7 @@ const authService = {
     const payload: JwtPayload = {
       userId: user._id.toString(),
       email: user.email,
-      role: user.role,
+      role: "Technician",
       type: "access",
     };
 
@@ -55,7 +54,7 @@ const authService = {
     const payload: JwtPayload = {
       userId: user._id.toString(),
       email: user.email,
-      role: user.role,
+      role: "Technician",
       type: "refresh",
     };
 
@@ -75,7 +74,7 @@ const authService = {
     try {
       const decoded = jwt.verify(
         token,
-        config.jwt.accessTokenSecret
+        config.jwt.accessTokenSecret,
       ) as JwtPayload;
 
       if (decoded.type !== "access") {
@@ -98,7 +97,7 @@ const authService = {
     try {
       const decoded = jwt.verify(
         token,
-        config.jwt.refreshTokenSecret
+        config.jwt.refreshTokenSecret,
       ) as JwtPayload;
 
       if (decoded.type !== "refresh") {
@@ -232,7 +231,7 @@ const authService = {
   getCurrentUser: async (userId: string): Promise<IUserDocument> => {
     try {
       const user = await User.findById(userId).select(
-        "-password -accessToken -refreshToken"
+        "-password -accessToken -refreshToken",
       );
       if (!user) {
         throw notFoundError("User not found", "User");
@@ -246,7 +245,7 @@ const authService = {
   changePassword: async (
     userId: string,
     oldPassword: string,
-    newPassword: string
+    newPassword: string,
   ): Promise<boolean> => {
     try {
       const user = await User.findById(userId);
@@ -256,7 +255,9 @@ const authService = {
 
       const isPasswordValid = await bcrypt.compare(oldPassword, user.password);
       if (!isPasswordValid) {
-        throw validationError("Current password is incorrect", { oldPassword: "Current password is incorrect" });
+        throw validationError("Current password is incorrect", {
+          oldPassword: "Current password is incorrect",
+        });
       }
 
       user.password = newPassword;
@@ -295,7 +296,7 @@ const authService = {
       await emailService.sendPasswordResetEmail(
         user.email,
         user.fullname,
-        resetToken
+        resetToken,
       );
 
       return true;
@@ -304,7 +305,10 @@ const authService = {
     }
   },
 
-  resetPassword: async (token: string, newPassword: string): Promise<boolean> => {
+  resetPassword: async (
+    token: string,
+    newPassword: string,
+  ): Promise<boolean> => {
     try {
       // Hash the incoming token to compare with stored hash
       const hashedToken = crypto
@@ -318,9 +322,7 @@ const authService = {
       });
 
       if (!user) {
-        throw validationError(
-          "Password reset token is invalid or has expired"
-        );
+        throw validationError("Password reset token is invalid or has expired");
       }
 
       // Set the new password (pre-save hook will hash it)
