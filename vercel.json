@@ -1,0 +1,19 @@
+{
+  "buildCommand": "pnpm build",
+  "outputDirectory": ".",
+  "functions": {
+    "api/**/*.ts": {
+      "includeFiles": "src/**/*.js"
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/graphql",
+      "destination": "/api/graphql"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/api/graphql"
+    }
+  ]
+}
