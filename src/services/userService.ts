@@ -6,21 +6,12 @@ import {
   validateId,
 } from "../utils/errors";
 
-export interface CreateUserInput {
-  profilePictureUrl: string;
-  fullname: string;
-  username: string;
-  email: string;
-  password: string;
-}
-
 export interface UpdateUserInput {
-  profilePictureUrl?: string;
-  fullname?: string;
-  username?: string;
+  namaLengkap?: string;
+  nip?: string;
   email?: string;
-  password?: string;
-  isActive?: boolean;
+  noHp?: string;
+  divisi?: "perencanaan_teknik" | "teknik_cabang" | "pengawasan_teknik";
 }
 
 const userService = {
@@ -50,38 +41,6 @@ const userService = {
     }
   },
 
-  createUser: async (input: CreateUserInput): Promise<IUserDocument> => {
-    try {
-      const existingEmail = await User.findOne({
-        email: input.email.toLowerCase(),
-      });
-      if (existingEmail) {
-        throw conflictError("Email already registered", "email");
-      }
-
-      const existingUsername = await User.findOne({
-        username: input.username.toLowerCase(),
-      });
-      if (existingUsername) {
-        throw conflictError("Username already taken", "username");
-      }
-
-      const user = new User({
-        ...input,
-        isActive: true,
-      });
-
-      await user.save();
-
-      const savedUser = await User.findById(user._id).select(
-        "-password -accessToken -refreshToken",
-      );
-      return savedUser!;
-    } catch (error) {
-      throw handleError(error, "UserService.create");
-    }
-  },
-
   updateUser: async (
     id: string,
     input: UpdateUserInput,
@@ -96,21 +55,34 @@ const userService = {
         });
         if (existingEmail) {
           throw conflictError(
-            "Email already registered by another user",
+            "Email ini sudah digunakan oleh teknisi lain",
             "email",
           );
         }
       }
 
-      if (input.username) {
-        const existingUsername = await User.findOne({
-          username: input.username.toLowerCase(),
+      if (input.nip) {
+        const existingNIP = await User.findOne({
+          nip: input.nip.trim(),
           _id: { $ne: id },
         });
-        if (existingUsername) {
+        if (existingNIP) {
           throw conflictError(
-            "Username already taken by another user",
-            "username",
+            "IP ini sudah digunakan oleh teknisi lain",
+            "nip",
+          );
+        }
+      }
+
+      if (input.noHp) {
+        const existingNohp = await User.findOne({
+          noHp: input.noHp.trim(),
+          _id: { $ne: id },
+        });
+        if (existingNohp) {
+          throw conflictError(
+            "No HP ini sudah digunakan oleh teknisi lain",
+            "nip",
           );
         }
       }

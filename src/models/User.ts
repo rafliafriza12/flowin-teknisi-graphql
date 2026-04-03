@@ -2,6 +2,7 @@ import mongoose, {
   Schema,
   Document,
   CallbackWithoutResultAndOptionalError,
+  Types,
 } from "mongoose";
 import bcrypt from "bcrypt";
 
@@ -10,17 +11,18 @@ import bcrypt from "bcrypt";
  * Role is NOT stored in MongoDB — it is embedded in the JWT only.
  */
 export interface IUser {
-  profilePictureUrl: string;
-  fullname: string;
-  username: string;
+  namaLengkap: string;
+  nip: string;
   email: string;
+  noHp: string;
+  pekerjaanSekarang?: Types.ObjectId | null;
+  divisi: "perencanaan_teknik" | "teknik_cabang" | "pengawasan_teknik";
   password: string;
   isActive: boolean;
   accessToken?: string;
   refreshToken?: string;
   resetPasswordToken?: string;
   resetPasswordExpires?: Date;
-  lastOnline?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -29,34 +31,28 @@ export interface IUserDocument extends IUser, Document {}
 
 const userSchema = new Schema<IUserDocument>(
   {
-    profilePictureUrl: {
+    namaLengkap: {
       type: String,
-      required: [true, "Profile Picture is required"],
+      required: [true, "Nama lengkap diperlukan"],
     },
-    fullname: {
+    nip: {
       type: String,
-      required: [true, "Full Name is required"],
-    },
-    username: {
-      type: String,
-      required: [true, "Username is required"],
-      unique: [true, "This username was used by other user"],
-      lowercase: true,
+      required: [true, "NIP diperlukan"],
+      unique: [true, "NIP ini sudah digunakan teknisi lain"],
       trim: true,
       validate: {
         validator: function (value: string) {
-          const regex = /^(?![_.])(?!.*[_.]{2})[a-z0-9._]{3,20}(?<![_.])$/;
+          const regex = /^[0-9]+$/;
 
           return regex.test(value);
         },
-        message:
-          "Username must be 3–20 characters, lowercase, and contain only letters, numbers, dots, or underscores. Cannot start or end with dot/underscore or contain repeated symbols.",
+        message: "NIP harus angka",
       },
     },
     email: {
       type: String,
-      required: [true, "Email is required"],
-      unique: [true, "This email was used by other user"],
+      required: [true, "Email diperlukan"],
+      unique: [true, "Email ini sudah digunakan teknisi lain"],
       lowercase: true,
       trim: true,
       validate: {
@@ -65,8 +61,36 @@ const userSchema = new Schema<IUserDocument>(
 
           return regex.test(value);
         },
-        message: "Email format is invalid",
+        message: "Format Email tidak valid",
       },
+    },
+    noHp: {
+      type: String,
+      required: [true, "No Hp is required"],
+      unique: [true, "This NIP was used by other user"],
+      trim: true,
+      validate: {
+        validator: function (value: string) {
+          const regex = /^[0-9]+$/;
+
+          return regex.test(value);
+        },
+        message: "NIP must contain only numbers",
+      },
+    },
+    pekerjaanSekarang: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "PekerjaanTeknisi",
+      required: false,
+      default: null,
+    },
+    divisi: {
+      type: String,
+      enum: {
+        values: ["perencanaan_teknik", "teknik_cabang", "pengawasan_teknik"],
+        message: "Divisi tidak valid",
+      },
+      required: [true, "Divisi wajib diisi"],
     },
     password: {
       type: String,
@@ -92,10 +116,6 @@ const userSchema = new Schema<IUserDocument>(
       type: Date,
       default: null,
     },
-    lastOnline: {
-      type: Date,
-      default: null,
-    },
   },
   { timestamps: true },
 );
@@ -115,4 +135,7 @@ userSchema.pre<IUserDocument>("save", async function (this: IUserDocument) {
   this.password = await bcrypt.hash(this.password, salt);
 });
 
-export const User = mongoose.model<IUserDocument>("User", userSchema);
+export const User = mongoose.model<IUserDocument>(
+  "TeknisiPerumdam",
+  userSchema,
+);

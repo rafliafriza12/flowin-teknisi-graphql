@@ -18,36 +18,28 @@ export interface RoutePermissions {
  */
 export const permissions: RoutePermissions = {
   Query: {
-    // Any authenticated role
+    // Auth Typedef
     me: ["Technician"],
 
-    // Technician or Admin
-    user: ["Admin", "Technician"],
-
-    // Admin only
-    users: ["Admin"],
-    usersByRole: ["Admin"],
+    // User Typedef
+    user: "public",
+    users: "public",
   },
 
   Mutation: {
-    // Public — no login required
+    // Auth Typedef
     login: "public",
     refreshToken: "public",
     forgotPassword: "public",
     resetPassword: "public",
+    logout: ["Technician"],
+    changePassword: "public",
+    register: "public",
 
-    // Any authenticated role
-    logout: ["Admin", "Technician", "User"],
-    changePassword: ["Admin", "Technician", "User"],
-
-    // Technician or Admin
-    updateUser: ["Admin", "Technician"],
-
-    // Admin only
-    register: ["Admin"],
-    createUser: ["Admin"],
-    deleteUser: ["Admin"],
-    toggleUserStatus: ["Admin"],
+    // User Typedef
+    updateUser: "public",
+    deleteUser: "public",
+    toggleUserStatus: "public",
   },
 };
 

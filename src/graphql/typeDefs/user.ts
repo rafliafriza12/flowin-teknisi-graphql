@@ -1,19 +1,29 @@
 const userTypeDefs = `#graphql
-    input CreateUserInput {
-        profilePictureUrl: String!
-        fullname: String!
-        username: String!
+     enum DivisiEnum {
+        perencanaan_teknik
+        teknik_cabang
+        pengawasan_teknik
+    }
+    
+    type User {
+         id: ID!
+        namaLengkap: String!
+        nip: String!
         email: String!
-        password: String!
+        noHp: String!
+        pekerjaanSekarang: ID
+        divisi: DivisiEnum!
+        isActive: Boolean!
+        createdAt: String!
+        updatedAt: String!
     }
 
     input UpdateUserInput {
-        profilePictureUrl: String
-        fullname: String
-        username: String
+       namaLengkap: String
+        nip: String
         email: String
-        password: String
-        isActive: Boolean
+        noHp: String
+        divisi: DivisiEnum
     }
 
     type ToggleUserStatusResponse {
@@ -33,7 +43,6 @@ const userTypeDefs = `#graphql
     }
 
     extend type Mutation {
-        createUser(input: CreateUserInput!): User!
         updateUser(id: ID!, input: UpdateUserInput!): User
         deleteUser(id: ID!): DeleteUserResponse!
         toggleUserStatus(id: ID!): ToggleUserStatusResponse!

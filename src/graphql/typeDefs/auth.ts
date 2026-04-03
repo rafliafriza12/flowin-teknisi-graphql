@@ -1,12 +1,19 @@
 const authTypeDefs = `#graphql
+    enum DivisiEnum {
+    perencanaan_teknik
+    teknik_cabang
+    pengawasan_teknik
+    }
+    
     type User {
-        id: ID!
-        profilePictureUrl: String!
-        fullname: String!
-        username: String!
+         id: ID!
+        namaLengkap: String!
+        nip: String!
         email: String!
+        noHp: String!
+        pekerjaanSekarang: ID
+        divisi: DivisiEnum!
         isActive: Boolean!
-        lastOnline: String
         createdAt: String!
         updatedAt: String!
     }
@@ -42,10 +49,11 @@ const authTypeDefs = `#graphql
     }
 
     input RegisterInput {
-        profilePictureUrl: String!
-        fullname: String!
-        username: String!
+       namaLengkap: String!
+        nip: String!
         email: String!
+        noHp: String!
+        divisi: DivisiEnum!
         password: String!
     }
 

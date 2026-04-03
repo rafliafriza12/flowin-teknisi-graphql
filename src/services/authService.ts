@@ -13,17 +13,28 @@ import {
 } from "../utils/errors";
 import emailService from "./emailService";
 
-interface LoginInput {
+export interface LoginInput {
   email: string;
   password: string;
 }
 
-interface RegisterInput {
-  profilePictureUrl: string;
-  fullname: string;
-  username: string;
+export interface RegisterInput {
+  namaLengkap: string;
+  nip: string;
   email: string;
+  noHp: string;
+  divisi: "perencanaan_teknik" | "teknik_cabang" | "pengawasan_teknik";
   password: string;
+}
+
+export interface ChangePasswordInput {
+  oldPassword: string;
+  newPassword: string;
+}
+
+export interface ResetPasswordInput {
+  token: string;
+  newPassword: string;
 }
 
 interface TokenPair {
@@ -138,7 +149,6 @@ const authService = {
 
       user.accessToken = tokens.accessToken;
       user.refreshToken = tokens.refreshToken;
-      user.lastOnline = new Date();
       await user.save();
 
       return { user, tokens };
@@ -153,14 +163,21 @@ const authService = {
         email: input.email.toLowerCase(),
       });
       if (existingEmail) {
-        throw validationError("Email already registered");
+        throw validationError("Email ini sudah digunakan oleh teknisi lain");
       }
 
-      const existingUsername = await User.findOne({
-        username: input.username.toLowerCase(),
+      const existingNIP = await User.findOne({
+        nip: input.nip.trim(),
       });
-      if (existingUsername) {
-        throw validationError("Username already taken");
+      if (existingNIP) {
+        throw validationError("NIP ini sudah digunakan oleh teknisi lain");
+      }
+
+      const existingNohp = await User.findOne({
+        noHp: input.noHp.trim(),
+      });
+      if (existingNohp) {
+        throw validationError("No HP ini sudah digunakan oleh teknisi lain");
       }
 
       const user = new User({
@@ -202,7 +219,6 @@ const authService = {
 
       user.accessToken = tokens.accessToken;
       user.refreshToken = tokens.refreshToken;
-      user.lastOnline = new Date();
       await user.save();
 
       return tokens;
@@ -244,8 +260,7 @@ const authService = {
 
   changePassword: async (
     userId: string,
-    oldPassword: string,
-    newPassword: string,
+    input: ChangePasswordInput,
   ): Promise<boolean> => {
     try {
       const user = await User.findById(userId);
@@ -253,14 +268,17 @@ const authService = {
         throw notFoundError("User not found", "User");
       }
 
-      const isPasswordValid = await bcrypt.compare(oldPassword, user.password);
+      const isPasswordValid = await bcrypt.compare(
+        input.oldPassword,
+        user.password,
+      );
       if (!isPasswordValid) {
         throw validationError("Current password is incorrect", {
           oldPassword: "Current password is incorrect",
         });
       }
 
-      user.password = newPassword;
+      user.password = input.newPassword;
       await user.save();
 
       return true;
@@ -295,7 +313,7 @@ const authService = {
       // Send email with the raw (unhashed) token
       await emailService.sendPasswordResetEmail(
         user.email,
-        user.fullname,
+        user.namaLengkap,
         resetToken,
       );
 
@@ -305,15 +323,12 @@ const authService = {
     }
   },
 
-  resetPassword: async (
-    token: string,
-    newPassword: string,
-  ): Promise<boolean> => {
+  resetPassword: async (input: ResetPasswordInput): Promise<boolean> => {
     try {
       // Hash the incoming token to compare with stored hash
       const hashedToken = crypto
         .createHash("sha256")
-        .update(token)
+        .update(input.token)
         .digest("hex");
 
       const user = await User.findOne({
@@ -326,7 +341,7 @@ const authService = {
       }
 
       // Set the new password (pre-save hook will hash it)
-      user.password = newPassword;
+      user.password = input.newPassword;
       user.resetPasswordToken = undefined;
       user.resetPasswordExpires = undefined;
       // Invalidate existing sessions

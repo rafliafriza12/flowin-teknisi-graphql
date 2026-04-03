@@ -1,28 +1,11 @@
 import { ByIdInput } from "../../types";
 import { handleError } from "../../utils/errors";
 import services from "../../services";
-import { CreateUserInput, UpdateUserInput } from "../../services/userService";
-
-interface CreateUserArgs {
-  input: {
-    profilePictureUrl: string;
-    fullname: string;
-    username: string;
-    email: string;
-    password: string;
-  };
-}
+import { UpdateUserInput } from "../../services/userService";
 
 interface UpdateUserArgs {
   id: string;
-  input: {
-    profilePictureUrl?: string;
-    fullname?: string;
-    username?: string;
-    email?: string;
-    isActive?: boolean;
-    password?: string;
-  };
+  input: UpdateUserInput;
 }
 
 const userResolver = {
@@ -45,14 +28,6 @@ const userResolver = {
   },
 
   Mutation: {
-    createUser: async (_: unknown, args: CreateUserArgs) => {
-      try {
-        return await services.userService.createUser(args.input);
-      } catch (error) {
-        throw handleError(error, "Resolver.createUser");
-      }
-    },
-
     updateUser: async (_: unknown, args: UpdateUserArgs) => {
       try {
         return await services.userService.updateUser(args.id, args.input);
@@ -89,6 +64,10 @@ const userResolver = {
 
   User: {
     id: (parent: { _id: { toString(): string } }) => parent._id.toString(),
+    pekerjaanSekarang: (parent: { pekerjaanSekarang?: any }) => {
+      if (!parent.pekerjaanSekarang) return null;
+      return parent.pekerjaanSekarang.toString();
+    },
   },
 };
 

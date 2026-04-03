@@ -18,7 +18,7 @@ function validateEnvVars() {
       console.error(`   - ${varName}`);
     });
     console.error(
-      "\n💡 Please check your .env file and ensure all required variables are set."
+      "\n💡 Please check your .env file and ensure all required variables are set.",
     );
     console.error("   Copy .env.example to .env and fill in the values.\n");
     process.exit(1);
@@ -37,7 +37,7 @@ function validateEnvVars() {
   //     );
   //     process.exit(1);
   //   }
-  // }  
+  // }
 }
 
 validateEnvVars();
@@ -54,7 +54,7 @@ export const config = {
   jwt: {
     accessTokenSecret: process.env.JWT_ACCESS_SECRET!,
     refreshTokenSecret: process.env.JWT_REFRESH_SECRET!,
-    accessTokenExpiresIn: process.env.JWT_ACCESS_EXPIRES_IN || "15m",
+    accessTokenExpiresIn: process.env.JWT_ACCESS_EXPIRES_IN || "1m",
     refreshTokenExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || "7d",
   },
 
@@ -73,4 +73,3 @@ export const config = {
 } as const;
 
 export type Config = typeof config;
-

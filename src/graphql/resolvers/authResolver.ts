@@ -1,22 +1,19 @@
 import { GraphQLContext } from "../../types";
 import { handleError } from "../../utils/errors";
 import services from "../../services";
+import {
+  ChangePasswordInput,
+  LoginInput,
+  RegisterInput,
+  ResetPasswordInput,
+} from "../../services/authService";
 
 interface LoginArgs {
-  input: {
-    email: string;
-    password: string;
-  };
+  input: LoginInput;
 }
 
 interface RegisterArgs {
-  input: {
-    profilePictureUrl: string;
-    fullname: string;
-    username: string;
-    email: string;
-    password: string;
-  };
+  input: RegisterInput;
 }
 
 interface RefreshTokenArgs {
@@ -24,10 +21,7 @@ interface RefreshTokenArgs {
 }
 
 interface ChangePasswordArgs {
-  input: {
-    oldPassword: string;
-    newPassword: string;
-  };
+  input: ChangePasswordInput;
 }
 
 interface ForgotPasswordArgs {
@@ -37,10 +31,7 @@ interface ForgotPasswordArgs {
 }
 
 interface ResetPasswordArgs {
-  input: {
-    token: string;
-    newPassword: string;
-  };
+  input: ResetPasswordInput;
 }
 
 const authResolver = {
@@ -114,8 +105,7 @@ const authResolver = {
         }
         await services.authService.changePassword(
           context.user._id.toString(),
-          args.input.oldPassword,
-          args.input.newPassword,
+          args.input,
         );
         return {
           success: true,
@@ -141,10 +131,7 @@ const authResolver = {
 
     resetPassword: async (_: unknown, args: ResetPasswordArgs) => {
       try {
-        await services.authService.resetPassword(
-          args.input.token,
-          args.input.newPassword,
-        );
+        await services.authService.resetPassword(args.input);
         return {
           success: true,
           message:
@@ -159,6 +146,10 @@ const authResolver = {
   User: {
     id: (parent: { _id: { toString(): string } }) => {
       return parent._id.toString();
+    },
+    pekerjaanSekarang: (parent: { pekerjaanSekarang?: any }) => {
+      if (!parent.pekerjaanSekarang) return null;
+      return parent.pekerjaanSekarang.toString();
     },
   },
 };
