@@ -24,6 +24,14 @@ export const permissions: RoutePermissions = {
     // User Typedef
     user: "public",
     users: "public",
+
+    // Work Order Typedef
+    workOrders: ["Admin"],
+    workOrder: ["Admin", "Technician"],
+    workOrdersSaya: ["Technician"],
+    workOrdersByKoneksiData: ["Admin", "Technician"],
+    workflowChain: ["Admin", "Technician"],
+    cekPrerequisitePekerjaan: ["Admin"],
   },
 
   Mutation: {
@@ -33,13 +41,28 @@ export const permissions: RoutePermissions = {
     forgotPassword: "public",
     resetPassword: "public",
     logout: ["Technician"],
-    changePassword: "public",
-    register: "public",
+    changePassword: ["Admin", "Technician"],
+    register: ["Admin"],
 
     // User Typedef
-    updateUser: "public",
-    deleteUser: "public",
-    toggleUserStatus: "public",
+    updateUser: ["Admin", "Technician"],
+    deleteUser: ["Admin"],
+    toggleUserStatus: ["Admin"],
+
+    // Work Order Typedef — Admin
+    buatWorkOrder: ["Admin"],
+    reviewTim: ["Admin"],
+    reviewHasil: ["Admin"],
+    reviewPenolakan: ["Admin"],
+    batalkanWorkOrder: ["Admin"],
+
+    // Work Order Typedef — Teknisi
+    terimaPekerjaan: ["Technician"],
+    ajukanPenolakan: ["Technician"],
+    ajukanTim: ["Technician"],
+    kerjaSendiri: ["Technician"],
+    simpanProgres: ["Technician"],
+    kirimHasil: ["Technician"],
   },
 };
 

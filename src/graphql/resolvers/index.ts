@@ -1,6 +1,7 @@
 import { scalarResolvers } from "../scalars";
 import authResolver from "./authResolver";
 import userResolver from "./userResolver";
+import workOrderResolver from "./workOrderResolver";
 import { withPermissions } from "../../middlewares";
 
 const mergeResolvers = (...resolversArray: Record<string, unknown>[]) => {
@@ -30,6 +31,7 @@ const rawResolvers = mergeResolvers(
   scalarResolvers,
   authResolver,
   userResolver,
+  workOrderResolver,
 );
 
 const resolvers = withPermissions(rawResolvers);

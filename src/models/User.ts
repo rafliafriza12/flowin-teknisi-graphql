@@ -66,8 +66,8 @@ const userSchema = new Schema<IUserDocument>(
     },
     noHp: {
       type: String,
-      required: [true, "No Hp is required"],
-      unique: [true, "This NIP was used by other user"],
+      required: [true, "No HP diperlukan"],
+      unique: [true, "No HP ini sudah digunakan teknisi lain"],
       trim: true,
       validate: {
         validator: function (value: string) {
@@ -75,7 +75,7 @@ const userSchema = new Schema<IUserDocument>(
 
           return regex.test(value);
         },
-        message: "NIP must contain only numbers",
+        message: "No HP harus berupa angka",
       },
     },
     pekerjaanSekarang: {
@@ -94,7 +94,7 @@ const userSchema = new Schema<IUserDocument>(
     },
     password: {
       type: String,
-      required: [true, "Password is required"],
+      required: [true, "Password diperlukan"],
     },
     isActive: {
       type: Boolean,
@@ -127,7 +127,7 @@ userSchema.pre<IUserDocument>("save", async function (this: IUserDocument) {
 
   if (!regex.test(this.password)) {
     throw new Error(
-      "Password must be at least 8 characters long, contain 1 uppercase letter, and 1 special character.",
+      "Password minimal 8 karakter, harus mengandung 1 huruf kapital, dan 1 karakter spesial.",
     );
   }
 
