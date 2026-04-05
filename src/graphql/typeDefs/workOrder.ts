@@ -38,7 +38,57 @@ const workOrderTypeDefs = `#graphql
     penolakan_ditolak
   }
 
+  enum StatusPengajuan {
+    PENDING
+    APPROVED
+    REJECTED
+  }
+
   # ─── Types ──────────────────────────────────────────────────────────────
+
+  "Data pelanggan pemilik koneksi (diambil dari collection Pengguna)"
+  type Pelanggan {
+    id: ID!
+    namaLengkap: String!
+    email: String!
+    noHp: String!
+    alamat: String
+  }
+
+  "Data koneksi / permohonan sambungan pelanggan yang terkait dengan work order"
+  type KoneksiData {
+    id: ID!
+    "Data pelanggan pemilik koneksi"
+    pelanggan: Pelanggan
+    "Status pengajuan koneksi data"
+    statusPengajuan: StatusPengajuan!
+    "NIK pelanggan (Nomor Induk Kependudukan)"
+    nik: String!
+    "Nomor Kartu Keluarga"
+    noKK: String!
+    "Nomor IMB (Izin Mendirikan Bangunan)"
+    imb: String!
+    "Alamat lengkap"
+    alamat: String!
+    "Kelurahan"
+    kelurahan: String!
+    "Kecamatan"
+    kecamatan: String!
+    "Luas bangunan (m2)"
+    luasBangunan: Float!
+    "Tanggal verifikasi"
+    tanggalVerifikasi: String
+    "Alasan penolakan (jika REJECTED)"
+    alasanPenolakan: String
+    "URL dokumen KTP"
+    nikUrl: String!
+    "URL dokumen KK"
+    kkUrl: String!
+    "URL dokumen IMB"
+    imbUrl: String!
+    createdAt: String!
+    updatedAt: String!
+  }
 
   type RiwayatReview {
     status: String!
@@ -57,6 +107,8 @@ const workOrderTypeDefs = `#graphql
   type WorkOrder {
     id: ID!
     idKoneksiData: ID!
+    "Data koneksi pelanggan yang terkait (nested)"
+    koneksiData: KoneksiData
     jenisPekerjaan: JenisPekerjaan!
     teknisiPenanggungJawab: User!
     tim: [User!]!
@@ -112,6 +164,33 @@ const workOrderTypeDefs = `#graphql
   type BatalkanWorkOrderResponse {
     success: Boolean!
     message: String!
+  }
+
+  # ─── Progres Data (untuk pre-fill form revisi) ──────────────────────────────
+
+  type KoordinatProgres {
+    longitude: Float!
+    latitude: Float!
+  }
+
+  "Data progres pekerjaan yang sudah tersimpan, digunakan untuk pre-fill form saat revisi"
+  type ProgresData {
+    jenisPekerjaan: JenisPekerjaan!
+    koordinat: KoordinatProgres
+    urlJaringan: String
+    diameterPipa: Float
+    urlPosisiBak: String
+    posisiMeteran: String
+    jumlahPenghuni: Int
+    standar: Boolean
+    totalBiaya: Float
+    urlRab: String
+    seriMeteran: String
+    fotoRumah: String
+    fotoMeteran: String
+    fotoMeteranDanRumah: String
+    urlGambar: [String!]
+    catatan: String
   }
 
   # ─── Inputs ─────────────────────────────────────────────────────────────
@@ -200,6 +279,9 @@ const workOrderTypeDefs = `#graphql
       idKoneksiData: ID!
       jenisPekerjaan: JenisPekerjaan!
     ): Boolean!
+
+    "Ambil data progres yang tersimpan untuk work order (untuk pre-fill form revisi)"
+    progresWorkOrder(workOrderId: ID!): ProgresData
   }
 
   # ─── Mutations ──────────────────────────────────────────────────────────

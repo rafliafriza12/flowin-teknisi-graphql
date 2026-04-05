@@ -10,9 +10,9 @@ interface UpdateUserArgs {
 
 const userResolver = {
   Query: {
-    users: async () => {
+    users: async (_: unknown, args: { search?: string }) => {
       try {
-        return await services.userService.getAllUsers();
+        return await services.userService.getAllUsers(args.search);
       } catch (error) {
         throw handleError(error, "Resolver.users");
       }

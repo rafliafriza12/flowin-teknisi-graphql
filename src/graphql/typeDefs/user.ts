@@ -38,7 +38,7 @@ const userTypeDefs = `#graphql
     }
 
     extend type Query {
-        users: [User!]!
+        users(search: String): [User!]!
         user(id: ID!): User
     }
 

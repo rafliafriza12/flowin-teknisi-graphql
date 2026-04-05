@@ -5,8 +5,12 @@ import mongoose, { Schema, Document, Types } from "mongoose";
 /**
  * Jenis pekerjaan teknisi.
  * Urutan dependensi:
- *   survei → rab → pemasangan → pengawasan_pemasangan → pengawasan_setelah_pemasangan
+ *   survei → rab → pemasangan ──┐
+ *                               ├→ pengawasan_setelah_pemasangan
+ *                rab → pengawasan_pemasangan ──┘
  *   penyelesaian_laporan (standalone, butuh DataConnection approved)
+ *
+ * Pemasangan dan pengawasan_pemasangan bisa dikerjakan BERSAMAAN (beda tim).
  */
 export const JENIS_PEKERJAAN = [
   "survei",
@@ -70,19 +74,21 @@ export type StatusTim = (typeof STATUS_TIM)[number];
 
 /**
  * Peta urutan dependensi pekerjaan.
- * Key = jenis pekerjaan, Value = jenis pekerjaan prasyarat (null = tidak ada prasyarat).
+ * Key = jenis pekerjaan, Value = array jenis pekerjaan prasyarat ([] = tidak ada prasyarat).
  *
  * Catatan khusus:
- * - "rab" membutuhkan "survei" selesai DAN RAB.statusPembayaran === "settlement" untuk lanjut ke pemasangan
- * - "penyelesaian_laporan" standalone (null) tapi butuh DataConnection approved
+ * - "pemasangan" dan "pengawasan_pemasangan" bisa dikerjakan BERSAMAAN (beda tim/teknisi),
+ *   keduanya hanya membutuhkan "rab" selesai + RAB.statusPembayaran === "settlement"
+ * - "pengawasan_setelah_pemasangan" membutuhkan KEDUANYA ("pemasangan" DAN "pengawasan_pemasangan") selesai
+ * - "penyelesaian_laporan" standalone ([]) tapi butuh DataConnection approved
  */
-export const URUTAN_PEKERJAAN: Record<JenisPekerjaan, JenisPekerjaan | null> = {
-  survei: null,
-  rab: "survei",
-  pemasangan: "rab",
-  pengawasan_pemasangan: "pemasangan",
-  pengawasan_setelah_pemasangan: "pengawasan_pemasangan",
-  penyelesaian_laporan: null,
+export const URUTAN_PEKERJAAN: Record<JenisPekerjaan, JenisPekerjaan[]> = {
+  survei: [],
+  rab: ["survei"],
+  pemasangan: ["rab"],
+  pengawasan_pemasangan: ["rab"],
+  pengawasan_setelah_pemasangan: ["pemasangan", "pengawasan_pemasangan"],
+  penyelesaian_laporan: [],
 };
 
 /**

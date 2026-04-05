@@ -42,12 +42,12 @@ export const permissions: RoutePermissions = {
     resetPassword: "public",
     logout: ["Technician"],
     changePassword: ["Admin", "Technician"],
-    register: ["Admin"],
+    register: "public",
 
     // User Typedef
     updateUser: ["Admin", "Technician"],
     deleteUser: ["Admin"],
-    toggleUserStatus: ["Admin"],
+    toggleUserStatus: "public",
 
     // Work Order Typedef — Admin
     buatWorkOrder: ["Admin"],

@@ -521,20 +521,26 @@ const workOrderService = {
         return false;
       }
 
-      // 3. Cek prerequisite pekerjaan sebelumnya
-      const prerequisite = URUTAN_PEKERJAAN[jenisPekerjaan];
-      if (prerequisite) {
+      // 3. Cek semua prerequisite pekerjaan sebelumnya (bisa lebih dari satu)
+      const prerequisites = URUTAN_PEKERJAAN[jenisPekerjaan];
+      for (const prereq of prerequisites) {
         const prereqWO = await WorkOrder.findOne({
           idKoneksiData,
-          jenisPekerjaan: prerequisite,
+          jenisPekerjaan: prereq,
           status: "selesai",
         }).lean();
         if (!prereqWO) {
           return false;
         }
 
-        // 4. Khusus pemasangan → RAB harus sudah settlement
-        if (jenisPekerjaan === "pemasangan" && prereqWO.idRAB) {
+        // 4. Pemasangan & pengawasan_pemasangan sama-sama butuh RAB settlement
+        // (keduanya bergantung pada "rab" sebagai prereq)
+        if (
+          (jenisPekerjaan === "pemasangan" ||
+            jenisPekerjaan === "pengawasan_pemasangan") &&
+          prereq === "rab" &&
+          prereqWO.idRAB
+        ) {
           const rab = await RAB.findById(prereqWO.idRAB).lean();
           if (!rab || rab.statusPembayaran !== "settlement") {
             return false;
@@ -604,13 +610,18 @@ const workOrderService = {
         );
       }
 
-      // Cari work order sebelumnya dalam rantai (jika ada prerequisite)
+      // Cari work order sebelumnya dalam rantai (ambil prerequisite terakhir dalam array)
       let workOrderSebelumnya: mongoose.Types.ObjectId | null = null;
-      const prerequisite = URUTAN_PEKERJAAN[input.jenisPekerjaan];
-      if (prerequisite) {
+      const prerequisites = URUTAN_PEKERJAAN[input.jenisPekerjaan];
+      // Ambil prerequisite paling akhir sebagai "sebelumnya" dalam rantai
+      const primaryPrerequisite =
+        prerequisites.length > 0
+          ? prerequisites[prerequisites.length - 1]
+          : null;
+      if (primaryPrerequisite) {
         const prereqWO = await WorkOrder.findOne({
           idKoneksiData: input.idKoneksiData,
-          jenisPekerjaan: prerequisite,
+          jenisPekerjaan: primaryPrerequisite,
           status: "selesai",
         }).lean();
         if (prereqWO) {
@@ -1137,7 +1148,26 @@ const workOrderService = {
 
       if (existingRefId) {
         // Update existing
-        await RefModel.findByIdAndUpdate(existingRefId, parsedData, {
+        const updateData: Record<string, unknown> = { ...parsedData };
+
+        // Untuk pengawasan_pemasangan: coba isi idPemasangan jika belum ter-link
+        if (wo.jenisPekerjaan === "pengawasan_pemasangan") {
+          const existingDoc = (await RefModel.findById(
+            existingRefId,
+          ).lean()) as Record<string, unknown> | null;
+          if (existingDoc && !existingDoc.idPemasangan) {
+            const pemasanganWO = await WorkOrder.findOne({
+              idKoneksiData: wo.idKoneksiData,
+              jenisPekerjaan: "pemasangan",
+              status: { $nin: ["dibatalkan"] },
+            }).lean();
+            if (pemasanganWO?.idPemasangan) {
+              updateData.idPemasangan = pemasanganWO.idPemasangan;
+            }
+          }
+        }
+
+        await RefModel.findByIdAndUpdate(existingRefId, updateData, {
           runValidators: true,
         });
       } else {
@@ -1149,19 +1179,32 @@ const workOrderService = {
           createData.idKoneksiData = wo.idKoneksiData;
         }
 
-        // Untuk pengawasan, ambil idPemasangan dari work order pemasangan selesai
+        // Untuk pengawasan, ambil idPemasangan dari work order pemasangan
         if (
           wo.jenisPekerjaan === "pengawasan_pemasangan" ||
           wo.jenisPekerjaan === "pengawasan_setelah_pemasangan"
         ) {
+          // pengawasan_setelah_pemasangan: pemasangan PASTI sudah selesai (prereq)
+          // pengawasan_pemasangan: pemasangan bisa berjalan bersamaan → ambil idPemasangan
+          //   dari WO pemasangan yang sudah punya dokumen (status bukan dibatalkan),
+          //   tidak harus selesai.
+          const statusFilter =
+            wo.jenisPekerjaan === "pengawasan_setelah_pemasangan"
+              ? { status: "selesai" }
+              : { status: { $nin: ["dibatalkan"] } };
+
           const pemasanganWO = await WorkOrder.findOne({
             idKoneksiData: wo.idKoneksiData,
             jenisPekerjaan: "pemasangan",
-            status: "selesai",
+            ...statusFilter,
           }).lean();
+
           if (pemasanganWO?.idPemasangan) {
             createData.idPemasangan = pemasanganWO.idPemasangan;
           }
+          // Jika idPemasangan belum ada (pemasangan belum simpanProgres),
+          // biarkan null — akan diisi nanti via updatePengawasanPemasangan
+          // atau saat kirimHasil dicek ulang.
         }
 
         // Untuk penyelesaian laporan, idLaporan harus ada di data
@@ -1357,6 +1400,29 @@ const workOrderService = {
       };
     } catch (error) {
       throw handleError(error, "WorkOrderService.batalkanWorkOrder");
+    }
+  },
+
+  /**
+   * Ambil data progres yang tersimpan untuk work order.
+   * Digunakan untuk pre-fill form saat teknisi merevisi pekerjaan.
+   */
+  getProgres: async (workOrderId: string) => {
+    try {
+      validateId(workOrderId, "workOrderId");
+      const wo = await findWorkOrderOrFail(workOrderId);
+
+      const refField = JENIS_KE_REF_FIELD[wo.jenisPekerjaan];
+      const docId = (wo as unknown as Record<string, unknown>)[refField];
+      if (!docId) return null;
+
+      const RefModel = getRefModel(wo.jenisPekerjaan);
+      const doc = await RefModel.findById(docId).lean();
+      if (!doc) return null;
+
+      return { jenisPekerjaan: wo.jenisPekerjaan, ...doc };
+    } catch (error) {
+      throw handleError(error, "WorkOrderService.getProgres");
     }
   },
 };

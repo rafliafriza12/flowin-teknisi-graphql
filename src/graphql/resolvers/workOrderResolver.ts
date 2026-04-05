@@ -1,6 +1,8 @@
+import mongoose from "mongoose";
 import { GraphQLContext, ByIdInput, PaginationInput } from "../../types";
 import { handleError } from "../../utils/errors";
 import services from "../../services";
+import { DataConnection } from "../../models";
 import {
   BuatWorkOrderInput,
   TerimaPekerjaanInput,
@@ -150,6 +152,14 @@ const workOrderResolver = {
         );
       } catch (error) {
         throw handleError(error, "Resolver.cekPrerequisitePekerjaan");
+      }
+    },
+
+    progresWorkOrder: async (_: unknown, args: { workOrderId: string }) => {
+      try {
+        return await services.workOrderService.getProgres(args.workOrderId);
+      } catch (error) {
+        throw handleError(error, "Resolver.progresWorkOrder");
       }
     },
   },
@@ -384,6 +394,14 @@ const workOrderResolver = {
     id: (parent: { _id: { toString(): string } }) => parent._id.toString(),
     idKoneksiData: (parent: { idKoneksiData: any }) =>
       parent.idKoneksiData?.toString() ?? null,
+    koneksiData: async (parent: { idKoneksiData: any }) => {
+      if (!parent.idKoneksiData) return null;
+      try {
+        return await DataConnection.findById(parent.idKoneksiData);
+      } catch {
+        return null;
+      }
+    },
     workOrderSebelumnya: (parent: { workOrderSebelumnya?: any }) =>
       parent.workOrderSebelumnya ?? null,
     idSurvei: (parent: { idSurvei?: any }) =>
@@ -400,12 +418,69 @@ const workOrderResolver = {
       parent.idPenyelesaianLaporan?.toString() ?? null,
   },
 
+  KoneksiData: {
+    id: (parent: { _id: { toString(): string } }) => parent._id.toString(),
+    pelanggan: async (parent: { IdPelanggan?: any }) => {
+      if (!parent.IdPelanggan) return null;
+      try {
+        const db = mongoose.connection.db;
+        if (!db) return null;
+        const doc = await db
+          .collection("penggunas")
+          .findOne({ _id: parent.IdPelanggan });
+        return doc ?? null;
+      } catch {
+        return null;
+      }
+    },
+    nik: (parent: { NIK: string }) => parent.NIK,
+    noKK: (parent: { NoKK: string }) => parent.NoKK,
+    imb: (parent: { IMB: string }) => parent.IMB,
+    alamat: (parent: { Alamat: string }) => parent.Alamat,
+    kelurahan: (parent: { Kelurahan: string }) => parent.Kelurahan,
+    kecamatan: (parent: { Kecamatan: string }) => parent.Kecamatan,
+    luasBangunan: (parent: { LuasBangunan: number }) => parent.LuasBangunan,
+    statusPengajuan: (parent: { StatusPengajuan: string }) =>
+      parent.StatusPengajuan,
+    tanggalVerifikasi: (parent: { TanggalVerifikasi?: Date | null }) =>
+      parent.TanggalVerifikasi?.toISOString() ?? null,
+    alasanPenolakan: (parent: { AlasanPenolakan?: string | null }) =>
+      parent.AlasanPenolakan ?? null,
+    nikUrl: (parent: { NIKUrl: string }) => parent.NIKUrl,
+    kkUrl: (parent: { KKUrl: string }) => parent.KKUrl,
+    imbUrl: (parent: { IMBUrl: string }) => parent.IMBUrl,
+    createdAt: (parent: { createdAt: Date }) => parent.createdAt.toISOString(),
+    updatedAt: (parent: { updatedAt: Date }) => parent.updatedAt.toISOString(),
+  },
+
+  Pelanggan: {
+    id: (parent: { _id: { toString(): string } }) => parent._id.toString(),
+    namaLengkap: (parent: any) =>
+      parent.namaLengkap ?? parent.nama ?? parent.fullName ?? "—",
+    email: (parent: any) => parent.email ?? "—",
+    noHp: (parent: any) => parent.noHp ?? parent.noTelp ?? parent.phone ?? "—",
+    alamat: (parent: any) => parent.alamat ?? parent.address ?? null,
+  },
+
   RiwayatReview: {
     tanggal: (parent: { tanggal: Date }) => parent.tanggal.toISOString(),
   },
 
   RiwayatRespon: {
     tanggal: (parent: { tanggal: Date }) => parent.tanggal.toISOString(),
+  },
+
+  ProgresData: {
+    koordinat: (parent: {
+      koordinat?: { longitude?: any; latitude?: any } | null;
+    }) => {
+      if (!parent.koordinat) return null;
+      const lon = parent.koordinat.longitude;
+      const lat = parent.koordinat.latitude;
+      if (lon == null || lat == null) return null;
+      return { longitude: parseFloat(lon), latitude: parseFloat(lat) };
+    },
+    urlGambar: (parent: { urlGambar?: any[] | null }) => parent.urlGambar ?? [],
   },
 };
 

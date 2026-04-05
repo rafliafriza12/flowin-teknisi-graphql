@@ -15,11 +15,18 @@ export interface UpdateUserInput {
 }
 
 const userService = {
-  getAllUsers: async (): Promise<IUserDocument[]> => {
+  getAllUsers: async (search?: string): Promise<IUserDocument[]> => {
     try {
-      return await User.find()
+      const query: Record<string, unknown> = {};
+
+      if (search && search.trim()) {
+        const regex = new RegExp(search.trim(), "i");
+        query.$or = [{ namaLengkap: regex }, { nip: regex }];
+      }
+
+      return await User.find(query)
         .select("-password -accessToken -refreshToken")
-        .sort({ createdAt: -1 });
+        .sort({ namaLengkap: 1 });
     } catch (error) {
       throw handleError(error, "UserService.getAll");
     }

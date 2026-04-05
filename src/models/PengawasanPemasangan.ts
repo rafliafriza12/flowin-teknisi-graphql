@@ -1,7 +1,7 @@
 import mongoose, { Schema, Document, Types } from "mongoose";
 
 export interface IPengawasanPemasangan {
-  idPemasangan: Types.ObjectId;
+  idPemasangan?: Types.ObjectId | null;
   urlGambar?: string[] | null;
   catatan?: string | null;
   createdAt: Date;
@@ -16,7 +16,8 @@ const pengawasanPemasanganSchema = new Schema<IPengawasanPemasanganDocument>(
     idPemasangan: {
       type: Schema.Types.ObjectId,
       ref: "Pemasangan",
-      required: [true, "ID pemasangan diperlukan"],
+      required: false,
+      default: null,
     },
 
     urlGambar: {
