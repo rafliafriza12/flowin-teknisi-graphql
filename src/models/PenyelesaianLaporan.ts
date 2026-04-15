@@ -15,7 +15,8 @@ const penyelesaianLaporanSchema = new Schema<IPenyelesaianLaporanDocument>(
   {
     idLaporan: {
       type: Schema.Types.ObjectId,
-      ref: "Laporan",
+      // ref sengaja tidak diisi — collection "laporans" dikelola oleh aplikasi mobile,
+      // tidak ada Mongoose model lokal. Akses via raw MongoDB driver.
       required: [true, "ID laporan diperlukan"],
     },
 

@@ -150,6 +150,8 @@ export interface IWorkOrder {
   idPengawasanPemasangan?: Types.ObjectId | null;
   idPengawasanSetelahPemasangan?: Types.ObjectId | null;
   idPenyelesaianLaporan?: Types.ObjectId | null;
+  // Referensi laporan asal (hanya untuk jenis penyelesaian_laporan)
+  idLaporan?: Types.ObjectId | null;
   // Review
   catatanReview?: string | null;
   riwayatReview: IRiwayatReview[];
@@ -166,7 +168,9 @@ const workOrderSchema = new Schema<IWorkOrderDocument>(
     idKoneksiData: {
       type: Schema.Types.ObjectId,
       ref: "KoneksiData",
-      required: [true, "ID koneksi data diperlukan"],
+      // Tidak wajib untuk jenis pekerjaan "penyelesaian_laporan"
+      required: false,
+      default: null,
       index: true,
     },
 
@@ -310,6 +314,14 @@ const workOrderSchema = new Schema<IWorkOrderDocument>(
       default: null,
     },
 
+    // Referensi laporan asal (hanya terisi untuk jenis penyelesaian_laporan)
+    // Collection "laporans" dikelola secara terpisah (tidak ada Mongoose model lokal)
+    idLaporan: {
+      type: Schema.Types.ObjectId,
+      default: null,
+      index: true,
+    },
+
     // ─── Review ────────────────────────────────────────────────────────
     catatanReview: {
       type: String,
@@ -360,8 +372,24 @@ workOrderSchema.index(
   { idKoneksiData: 1, jenisPekerjaan: 1 },
   {
     unique: true,
-    partialFilterExpression: { status: { $ne: "dibatalkan" } },
+    partialFilterExpression: {
+      status: { $ne: "dibatalkan" },
+      idKoneksiData: { $ne: null },
+    },
     name: "unique_active_wo_per_jenis_per_koneksi",
+  },
+);
+
+// Unique partial index: hanya boleh 1 WO aktif penyelesaian_laporan per laporan
+workOrderSchema.index(
+  { idLaporan: 1 },
+  {
+    unique: true,
+    partialFilterExpression: {
+      status: { $ne: "dibatalkan" },
+      idLaporan: { $ne: null },
+    },
+    name: "unique_active_wo_per_laporan",
   },
 );
 
@@ -386,6 +414,13 @@ workOrderSchema.pre("validate", function () {
   if (!this.isNew && this.isModified("workOrderSebelumnya")) {
     throw new Error(
       "Referensi work order sebelumnya tidak dapat diubah setelah work order dibuat",
+    );
+  }
+
+  // Immutability: idLaporan tidak boleh diubah setelah dibuat
+  if (!this.isNew && this.isModified("idLaporan")) {
+    throw new Error(
+      "Referensi laporan tidak dapat diubah setelah work order dibuat",
     );
   }
 

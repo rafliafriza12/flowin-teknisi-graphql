@@ -30,12 +30,41 @@ import {
 } from "../utils/errors";
 import { verifyPayloadSignature } from "../utils/signatureHash";
 
+// ─── Raw collection helper: Laporan ──────────────────────────────────────────
+// Collection "laporans" dikelola oleh aplikasi mobile/pelanggan, tidak ada
+// Mongoose model lokal. Semua akses menggunakan raw MongoDB driver.
+
+type StatusLaporan = "Diajukan" | "ProsesPerbaikan" | "Selesai";
+
+const getLaporanCollection = () => {
+  const db = mongoose.connection.db;
+  if (!db) throw new Error("Database belum terkoneksi");
+  return db.collection("laporans");
+};
+
+const findLaporanById = async (id: string) => {
+  const col = getLaporanCollection();
+  return col.findOne({ _id: new mongoose.Types.ObjectId(id) });
+};
+
+const updateLaporanStatus = async (
+  id: string | mongoose.Types.ObjectId,
+  status: StatusLaporan,
+) => {
+  const col = getLaporanCollection();
+  await col.updateOne(
+    { _id: new mongoose.Types.ObjectId(id.toString()) },
+    { $set: { Status: status, updatedAt: new Date() } },
+  );
+};
+
 // ─── Input Interfaces ─────────────────────────────────────────────────────────
 
 export interface BuatWorkOrderInput {
   idKoneksiData: string;
   jenisPekerjaan: JenisPekerjaan;
   teknisiPenanggungJawab: string;
+  idLaporan?: string | null;
 }
 
 export interface TerimaPekerjaanInput {
@@ -451,10 +480,11 @@ const workOrderService = {
         let bisaDibuat = false;
         if (chainStatus === "belum_dibuat" || chainStatus === "dibatalkan") {
           try {
-            bisaDibuat = await workOrderService.cekPrerequisite(
+            const reason = await workOrderService.cekPrerequisite(
               idKoneksiData,
               jenis,
             );
+            bisaDibuat = reason === null;
           } catch {
             bisaDibuat = false;
           }
@@ -487,14 +517,19 @@ const workOrderService = {
    * 2. Belum ada work order aktif untuk jenis yang sama pada koneksi data ini
    * 3. Jika ada prerequisite pekerjaan → work order prerequisite harus berstatus "selesai"
    * 4. Untuk pemasangan → RAB harus statusPembayaran === "settlement"
+   *
+   * Khusus penyelesaian_laporan:
+   * 1. Laporan harus ada dan berstatus "menunggu"
+   * 2. Belum ada WO aktif untuk laporan yang sama
+   *
+   * Return: null jika semua terpenuhi, string alasan jika gagal.
    */
   cekPrerequisite: async (
     idKoneksiData: string,
     jenisPekerjaan: JenisPekerjaan,
-  ): Promise<boolean> => {
+    idLaporan?: string | null,
+  ): Promise<string | null> => {
     try {
-      validateId(idKoneksiData, "idKoneksiData");
-
       if (!JENIS_PEKERJAAN.includes(jenisPekerjaan)) {
         throw badUserInputError(
           `Jenis pekerjaan '${jenisPekerjaan}' tidak valid`,
@@ -502,13 +537,44 @@ const workOrderService = {
         );
       }
 
+      // ─── Path khusus: penyelesaian_laporan ────────────────────────────────
+      if (jenisPekerjaan === "penyelesaian_laporan") {
+        if (!idLaporan) {
+          return "ID laporan wajib diisi untuk jenis pekerjaan 'penyelesaian_laporan'.";
+        }
+        validateId(idLaporan, "idLaporan");
+
+        const laporan = await findLaporanById(idLaporan);
+        if (!laporan) {
+          return `Laporan dengan ID '${idLaporan}' tidak ditemukan.`;
+        }
+        if (laporan.Status !== "Diajukan") {
+          return `Laporan '${idLaporan}' tidak dalam status 'Diajukan' (status saat ini: '${laporan.Status}'). Laporan mungkin sudah diproses atau selesai.`;
+        }
+
+        // Cek WO aktif untuk laporan yang sama
+        const existingWO = await WorkOrder.findOne({
+          idLaporan,
+          jenisPekerjaan: "penyelesaian_laporan",
+          status: { $nin: ["dibatalkan"] },
+        }).lean();
+        if (existingWO) {
+          return `Work order penyelesaian untuk laporan ini sudah ada dan sedang aktif (ID: ${existingWO._id}). Batalkan terlebih dahulu jika ingin membuat ulang.`;
+        }
+
+        return null;
+      }
+
+      // ─── Path umum: jenis pekerjaan berbasis koneksi data ─────────────────
+      validateId(idKoneksiData, "idKoneksiData");
+
       // 1. DataConnection harus ada dan APPROVED
       const koneksiData = await DataConnection.findById(idKoneksiData).lean();
       if (!koneksiData) {
-        return false;
+        return `Koneksi data dengan ID '${idKoneksiData}' tidak ditemukan.`;
       }
       if (koneksiData.StatusPengajuan !== "APPROVED") {
-        return false;
+        return `Status pengajuan koneksi data belum disetujui (status saat ini: '${koneksiData.StatusPengajuan}').`;
       }
 
       // 2. Belum ada work order aktif untuk jenis yang sama
@@ -518,7 +584,7 @@ const workOrderService = {
         status: { $nin: ["dibatalkan"] },
       }).lean();
       if (existing) {
-        return false;
+        return `Work order untuk pekerjaan '${jenisPekerjaan}' sudah ada dan sedang aktif (ID: ${existing._id}). Batalkan terlebih dahulu jika ingin membuat ulang.`;
       }
 
       // 3. Cek semua prerequisite pekerjaan sebelumnya (bisa lebih dari satu)
@@ -530,7 +596,7 @@ const workOrderService = {
           status: "selesai",
         }).lean();
         if (!prereqWO) {
-          return false;
+          return `Pekerjaan '${prereq}' belum selesai. Selesaikan terlebih dahulu sebelum membuat '${jenisPekerjaan}'.`;
         }
 
         // 4. Pemasangan & pengawasan_pemasangan sama-sama butuh RAB settlement
@@ -543,12 +609,12 @@ const workOrderService = {
         ) {
           const rab = await RAB.findById(prereqWO.idRAB).lean();
           if (!rab || rab.statusPembayaran !== "settlement") {
-            return false;
+            return `Status pembayaran RAB belum 'settlement' (saat ini: '${rab?.statusPembayaran ?? "tidak ditemukan"}'). Selesaikan pembayaran terlebih dahulu.`;
           }
         }
       }
 
-      return true;
+      return null;
     } catch (error) {
       throw handleError(error, "WorkOrderService.cekPrerequisite");
     }
@@ -573,22 +639,24 @@ const workOrderService = {
   ): Promise<IWorkOrderDocument> => {
     try {
       // Validasi input IDs
-      validateId(input.idKoneksiData, "idKoneksiData");
       validateId(input.teknisiPenanggungJawab, "teknisiPenanggungJawab");
+
+      // Untuk penyelesaian_laporan: idKoneksiData tidak wajib
+      if (input.jenisPekerjaan !== "penyelesaian_laporan") {
+        validateId(input.idKoneksiData, "idKoneksiData");
+      }
 
       // Verifikasi signature
       verifyPayloadSignature(context.req.headers, input);
 
-      // Cek prerequisite
-      const isEligible = await workOrderService.cekPrerequisite(
+      // Cek prerequisite (pass idLaporan untuk penyelesaian_laporan)
+      const denialReason = await workOrderService.cekPrerequisite(
         input.idKoneksiData,
         input.jenisPekerjaan,
+        input.idLaporan,
       );
-      if (!isEligible) {
-        throw validationError(
-          `Prerequisite untuk pekerjaan '${input.jenisPekerjaan}' belum terpenuhi. ` +
-            `Pastikan pekerjaan sebelumnya sudah selesai dan semua kondisi terpenuhi.`,
-        );
+      if (denialReason !== null) {
+        throw validationError(denialReason);
       }
 
       // Validasi teknisi ada dan aktif
@@ -631,7 +699,10 @@ const workOrderService = {
 
       // Buat work order — status awal "menunggu_respon"
       const wo = new WorkOrder({
-        idKoneksiData: input.idKoneksiData,
+        idKoneksiData:
+          input.jenisPekerjaan !== "penyelesaian_laporan"
+            ? input.idKoneksiData
+            : null,
         jenisPekerjaan: input.jenisPekerjaan,
         teknisiPenanggungJawab: input.teknisiPenanggungJawab,
         tim: [],
@@ -641,9 +712,15 @@ const workOrderService = {
         workOrderSebelumnya,
         riwayatReview: [],
         riwayatRespon: [],
+        ...(input.idLaporan ? { idLaporan: input.idLaporan } : {}),
       });
 
       await wo.save();
+
+      // Jika penyelesaian_laporan: ubah status Laporan → "ProsesPerbaikan"
+      if (input.jenisPekerjaan === "penyelesaian_laporan" && input.idLaporan) {
+        await updateLaporanStatus(input.idLaporan, "ProsesPerbaikan");
+      }
 
       // TIDAK update pekerjaanSekarang di sini.
       // pekerjaanSekarang baru di-set saat teknisi MENERIMA pekerjaan.
@@ -1208,6 +1285,15 @@ const workOrderService = {
         }
 
         // Untuk penyelesaian laporan, idLaporan harus ada di data
+        if (wo.jenisPekerjaan === "penyelesaian_laporan") {
+          if (!wo.idLaporan) {
+            throw validationError(
+              "Work order penyelesaian laporan tidak memiliki referensi laporan (idLaporan kosong).",
+            );
+          }
+          createData.idLaporan = wo.idLaporan;
+        }
+
         const doc = new RefModel(createData);
         await doc.save();
 
@@ -1328,6 +1414,27 @@ const workOrderService = {
           },
           { pekerjaanSekarang: null },
         );
+
+        // Jika ini pekerjaan RAB → generate payment link otomatis
+        if (wo.jenisPekerjaan === "rab" && wo.idRAB) {
+          try {
+            const paymentService = (await import("./paymentService")).default;
+            await paymentService.generatePaymentLink(wo.idRAB.toString());
+          } catch (payErr) {
+            // Jangan gagalkan review jika payment link gagal dibuat
+            // (bisa dicoba ulang nanti via mutation terpisah)
+            console.error(
+              "[reviewHasil] Gagal generate payment link untuk RAB:",
+              wo.idRAB,
+              payErr,
+            );
+          }
+        }
+
+        // Jika ini pekerjaan penyelesaian_laporan → ubah status Laporan → "Selesai"
+        if (wo.jenisPekerjaan === "penyelesaian_laporan" && wo.idLaporan) {
+          await updateLaporanStatus(wo.idLaporan, "Selesai");
+        }
       } else {
         if (!input.catatan || input.catatan.trim().length < 10) {
           throw validationError(
@@ -1392,6 +1499,11 @@ const workOrderService = {
           },
           { pekerjaanSekarang: null },
         );
+      }
+
+      // Jika penyelesaian_laporan dibatalkan → kembalikan status Laporan → "Diajukan"
+      if (wo.jenisPekerjaan === "penyelesaian_laporan" && wo.idLaporan) {
+        await updateLaporanStatus(wo.idLaporan, "Diajukan");
       }
 
       return {

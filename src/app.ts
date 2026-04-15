@@ -14,6 +14,7 @@ import {
   apiKeyMiddleware,
   rateLimiterMiddleware,
 } from "./middlewares";
+import paymentService from "./services/paymentService";
 
 const app = express();
 const httpServer = http.createServer(app);
@@ -94,6 +95,20 @@ export const startApolloServer = async () => {
       timestamp: new Date().toISOString(),
       environment: config.nodeEnv,
     });
+  });
+
+  // ─── Midtrans Webhook ────────────────────────────────────────────────────
+  // Endpoint ini dipanggil oleh Midtrans setelah status pembayaran berubah.
+  // Daftarkan URL ini di Midtrans Dashboard → Settings → Configuration →
+  // Payment Notification URL: https://yourdomain.com/api/payment/notification
+  app.post("/api/payment/notification", async (req: Request, res: Response) => {
+    try {
+      await paymentService.handleNotification(req.body);
+      res.status(200).json({ status: "ok" });
+    } catch (error) {
+      console.error("[Midtrans Webhook] Error:", error);
+      res.status(500).json({ status: "error" });
+    }
   });
 
   const graphqlMiddleware = createExpressMiddleware(apolloServer, {

@@ -70,6 +70,12 @@ export const config = {
   frontendUrl: process.env.FRONTEND_URL || "http://localhost:3000",
 
   internalApiSecret: process.env.INTERNAL_API_SECRET || "",
+
+  midtrans: {
+    serverKey: process.env.MIDTRANS_SERVER_KEY || "",
+    clientKey: process.env.MIDTRANS_CLIENT_KEY || "",
+    isProduction: process.env.MIDTRANS_IS_PRODUCTION === "true",
+  },
 } as const;
 
 export type Config = typeof config;

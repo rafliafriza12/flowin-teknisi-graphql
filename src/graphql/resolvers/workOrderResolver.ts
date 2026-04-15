@@ -78,6 +78,10 @@ interface BatalkanWorkOrderArgs {
   catatan?: string | null;
 }
 
+interface LaporanArgs {
+  id: string;
+}
+
 // ─── Resolver ─────────────────────────────────────────────────────────────────
 
 const workOrderResolver = {
@@ -146,10 +150,11 @@ const workOrderResolver = {
 
     cekPrerequisitePekerjaan: async (_: unknown, args: CekPrerequisiteArgs) => {
       try {
-        return await services.workOrderService.cekPrerequisite(
+        const reason = await services.workOrderService.cekPrerequisite(
           args.idKoneksiData,
           args.jenisPekerjaan as any,
         );
+        return reason === null;
       } catch (error) {
         throw handleError(error, "Resolver.cekPrerequisitePekerjaan");
       }
@@ -160,6 +165,22 @@ const workOrderResolver = {
         return await services.workOrderService.getProgres(args.workOrderId);
       } catch (error) {
         throw handleError(error, "Resolver.progresWorkOrder");
+      }
+    },
+
+    paymentLinkRAB: async (_: unknown, args: { rabId: string }) => {
+      try {
+        return await services.paymentService.generatePaymentLink(args.rabId);
+      } catch (error) {
+        throw handleError(error, "Resolver.paymentLinkRAB");
+      }
+    },
+
+    laporan: async (_: unknown, args: LaporanArgs) => {
+      try {
+        return await services.laporanService.getById(args.id);
+      } catch (error) {
+        throw handleError(error, "Resolver.laporan");
       }
     },
   },
@@ -416,6 +437,8 @@ const workOrderResolver = {
     }) => parent.idPengawasanSetelahPemasangan?.toString() ?? null,
     idPenyelesaianLaporan: (parent: { idPenyelesaianLaporan?: any }) =>
       parent.idPenyelesaianLaporan?.toString() ?? null,
+    idLaporan: (parent: { idLaporan?: any }) =>
+      parent.idLaporan?.toString() ?? null,
   },
 
   KoneksiData: {
@@ -481,6 +504,42 @@ const workOrderResolver = {
       return { longitude: parseFloat(lon), latitude: parseFloat(lat) };
     },
     urlGambar: (parent: { urlGambar?: any[] | null }) => parent.urlGambar ?? [],
+  },
+
+  Laporan: {
+    id: (parent: { _id: { toString(): string } }) => parent._id.toString(),
+    IdPengguna: (parent: { IdPengguna?: any }) =>
+      parent.IdPengguna?.toString() ?? null,
+    imageUrl: (parent: { ImageURL?: any[] | null; imageUrl?: any[] | null }) =>
+      parent.ImageURL ?? parent.imageUrl ?? [],
+    Catatan: (parent: { Catatan?: string | null }) => parent.Catatan ?? null,
+    Kordinat: (parent: {
+      Koordinat?: { longitude?: any; latitude?: any } | null;
+    }) => {
+      if (!parent.Koordinat) return null;
+      return {
+        longitude: parent.Koordinat.longitude,
+        latitude: parent.Koordinat.latitude,
+      };
+    },
+    createdAt: (parent: { createdAt: Date }) =>
+      parent.createdAt instanceof Date
+        ? parent.createdAt.toISOString()
+        : String(parent.createdAt),
+    updatedAt: (parent: { updatedAt: Date }) =>
+      parent.updatedAt instanceof Date
+        ? parent.updatedAt.toISOString()
+        : String(parent.updatedAt),
+  },
+
+  PenggunaLaporan: {
+    id: (parent: { _id: { toString(): string }; id?: string }) =>
+      parent.id ?? parent._id?.toString() ?? null,
+    namaLengkap: (parent: { namaLengkap?: string | null }) =>
+      parent.namaLengkap ?? null,
+    email: (parent: { email?: string | null }) => parent.email ?? null,
+    noHp: (parent: { noHp?: string | null }) => parent.noHp ?? null,
+    alamat: (parent: { alamat?: string | null }) => parent.alamat ?? null,
   },
 };
 

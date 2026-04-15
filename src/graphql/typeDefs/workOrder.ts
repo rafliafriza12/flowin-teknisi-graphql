@@ -106,7 +106,8 @@ const workOrderTypeDefs = `#graphql
 
   type WorkOrder {
     id: ID!
-    idKoneksiData: ID!
+    "Null untuk jenis pekerjaan penyelesaian_laporan"
+    idKoneksiData: ID
     "Data koneksi pelanggan yang terkait (nested)"
     koneksiData: KoneksiData
     jenisPekerjaan: JenisPekerjaan!
@@ -130,6 +131,8 @@ const workOrderTypeDefs = `#graphql
     idPengawasanPemasangan: ID
     idPengawasanSetelahPemasangan: ID
     idPenyelesaianLaporan: ID
+    "Referensi laporan asal (hanya untuk penyelesaian_laporan)"
+    idLaporan: ID
     # ─── Review ─────────────────────────────────────────────
     catatanReview: String
     riwayatReview: [RiwayatReview!]!
@@ -196,9 +199,11 @@ const workOrderTypeDefs = `#graphql
   # ─── Inputs ─────────────────────────────────────────────────────────────
 
   input BuatWorkOrderInput {
-    idKoneksiData: ID!
+    idKoneksiData: ID
     jenisPekerjaan: JenisPekerjaan!
     teknisiPenanggungJawab: ID!
+    "Wajib diisi jika jenisPekerjaan adalah penyelesaian_laporan"
+    idLaporan: ID
   }
 
   input AjukanTimInput {
@@ -255,6 +260,53 @@ const workOrderTypeDefs = `#graphql
     catatan: String
   }
 
+  # ─── Laporan ─────────────────────────────────────────────────────────────
+
+  enum StatusLaporan {
+    Diajukan
+    ProsesPerbaikan
+    Selesai
+  }
+
+  enum JenisLaporan {
+    AirTidakMengalir
+    AirKeruh
+    KebocoranPipa
+    MeteranBermasalah
+    KendalaLainnya
+  }
+
+  type KoordinatLaporan {
+    longitude: Float!
+    latitude: Float!
+  }
+
+  type PenggunaLaporan {
+    id: ID
+    namaLengkap: String
+    email: String
+    noHp: String
+    alamat: String
+  }
+
+  "Laporan keluhan/masalah yang dikirim oleh pelanggan via aplikasi mobile"
+  type Laporan {
+    id: ID!
+    IdPengguna: ID!
+    "Data pengguna yang mengirim laporan (populated)"
+    pengguna: PenggunaLaporan
+    NamaLaporan: String!
+    Masalah: String!
+    Alamat: String!
+    imageUrl: [String!]!
+    JenisLaporan: JenisLaporan!
+    Catatan: String
+    Kordinat: KoordinatLaporan
+    Status: StatusLaporan!
+    createdAt: String!
+    updatedAt: String!
+  }
+
   # ─── Queries ────────────────────────────────────────────────────────────
 
   extend type Query {
@@ -282,6 +334,17 @@ const workOrderTypeDefs = `#graphql
 
     "Ambil data progres yang tersimpan untuk work order (untuk pre-fill form revisi)"
     progresWorkOrder(workOrderId: ID!): ProgresData
+
+    "Generate atau ambil ulang payment link Midtrans untuk RAB (jika sudah expired/cancel)"
+    paymentLinkRAB(rabId: ID!): PaymentLinkResponse!
+
+    "Ambil satu laporan berdasarkan ID — untuk teknisi melihat detail laporan yang di-assign"
+    laporan(id: ID!): Laporan
+  }
+
+  type PaymentLinkResponse {
+    orderId: String!
+    paymentUrl: String!
   }
 
   # ─── Mutations ──────────────────────────────────────────────────────────
