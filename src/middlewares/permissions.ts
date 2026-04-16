@@ -32,6 +32,12 @@ export const permissions: RoutePermissions = {
     workOrdersByKoneksiData: ["Admin", "Technician"],
     workflowChain: ["Admin", "Technician"],
     cekPrerequisitePekerjaan: ["Admin"],
+
+    // Work Order Typedef — Teknisi
+    progresWorkOrder: ["Admin", "Technician"],
+    paymentLinkRAB: ["Admin", "Technician"],
+    laporan: ["Admin", "Technician"],
+    dashboardStats: ["Technician"],
   },
 
   Mutation: {
@@ -42,12 +48,12 @@ export const permissions: RoutePermissions = {
     resetPassword: "public",
     logout: ["Technician"],
     changePassword: ["Admin", "Technician"],
-    register: "public",
+    register: ["Admin"],
 
     // User Typedef
-    updateUser: ["Admin", "Technician"],
+    updateUser: ["Admin"],
     deleteUser: ["Admin"],
-    toggleUserStatus: "public",
+    toggleUserStatus: ["Admin"],
 
     // Work Order Typedef — Admin
     buatWorkOrder: ["Admin"],

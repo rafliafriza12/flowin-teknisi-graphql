@@ -6,7 +6,7 @@ let transporter: nodemailer.Transporter | null = null;
 const getTransporter = (): nodemailer.Transporter => {
   if (!config.smtp.user || !config.smtp.pass) {
     throw new Error(
-      "SMTP credentials are not configured. Please set SMTP_USER and SMTP_PASS environment variables."
+      "SMTP credentials are not configured. Please set SMTP_USER and SMTP_PASS environment variables.",
     );
   }
 
@@ -35,7 +35,7 @@ const emailService = {
   sendMail: async (options: SendMailOptions): Promise<void> => {
     const mailer = getTransporter();
     await mailer.sendMail({
-      from: `"Your Site Name" <${config.smtp.from}>`,
+      from: `"Flowin" <${config.smtp.from}>`,
       to: options.to,
       subject: options.subject,
       html: options.html,
@@ -45,7 +45,7 @@ const emailService = {
   sendPasswordResetEmail: async (
     to: string,
     fullname: string,
-    resetToken: string
+    resetToken: string,
   ): Promise<void> => {
     const resetUrl = `${config.frontendUrl}/login/reset-password?token=${resetToken}`;
 
@@ -66,11 +66,8 @@ const emailService = {
                 <tr>
                   <td style="padding: 32px 32px 24px; text-align: center; border-bottom: 1px solid #eee;">
                     <h1 style="margin: 0; font-size: 20px; font-weight: 700; color: #2d3a2e; letter-spacing: -0.3px;">
-                      Your SIte
+                      Flowin
                     </h1>
-                    <p style="margin: 4px 0 0; font-size: 12px; color: #8a8a8a; text-transform: uppercase; letter-spacing: 1px;">
-                      Content Management System
-                    </p>
                   </td>
                 </tr>
 
@@ -116,7 +113,7 @@ const emailService = {
                 <tr>
                   <td style="padding: 20px 32px; border-top: 1px solid #eee; text-align: center;">
                     <p style="margin: 0; font-size: 11px; color: #aaa;">
-                      © ${new Date().getFullYear()} Bumi Resources. All rights reserved.
+                      © ${new Date().getFullYear()} Flowin. All rights reserved.
                     </p>
                   </td>
                 </tr>
@@ -131,7 +128,7 @@ const emailService = {
 
     await emailService.sendMail({
       to,
-      subject: "Reset Your Password — Bumi Resources CMS",
+      subject: "Reset Your Password — Flowin",
       html,
     });
   },
