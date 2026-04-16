@@ -125,6 +125,20 @@ const workOrderResolver = {
       }
     },
 
+    dashboardStats: async (
+      _: unknown,
+      __: unknown,
+      context: GraphQLContext,
+    ) => {
+      try {
+        return await services.workOrderService.getDashboardStats(
+          context.user!._id.toString(),
+        );
+      } catch (error) {
+        throw handleError(error, "Resolver.dashboardStats");
+      }
+    },
+
     workOrdersByKoneksiData: async (
       _: unknown,
       args: WorkOrdersByKoneksiDataArgs,

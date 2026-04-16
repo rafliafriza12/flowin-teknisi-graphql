@@ -340,6 +340,31 @@ const workOrderTypeDefs = `#graphql
 
     "Ambil satu laporan berdasarkan ID — untuk teknisi melihat detail laporan yang di-assign"
     laporan(id: ID!): Laporan
+
+    "Statistik agregat dashboard untuk teknisi yang sedang login"
+    dashboardStats: DashboardStats!
+  }
+
+  type DashboardStats {
+    totalHariIni: Int!
+    totalBulanIni: Int!
+    totalSelesai: Int!
+    totalBelumSelesai: Int!
+    grafikMingguan: [GrafikDataPoint!]!
+    grafikBulanan: [GrafikDataPoint!]!
+    grafikTahunan: [GrafikDataPoint!]!
+    distribusiJenis: [DistribusiJenisItem!]!
+  }
+
+  type GrafikDataPoint {
+    label: String!
+    total: Int!
+    selesai: Int!
+  }
+
+  type DistribusiJenisItem {
+    jenis: String!
+    total: Int!
   }
 
   type PaymentLinkResponse {

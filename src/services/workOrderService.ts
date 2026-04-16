@@ -377,6 +377,172 @@ const workOrderService = {
   },
 
   /**
+   * Aggregate dashboard statistics untuk satu teknisi.
+   * Semua kalkulasi dilakukan di MongoDB agar akurat dan tidak bergantung pada limit pagination.
+   */
+  getDashboardStats: async (teknisiId: string) => {
+    try {
+      const matchTeknisi = {
+        $or: [
+          { teknisiPenanggungJawab: new mongoose.Types.ObjectId(teknisiId) },
+          { tim: new mongoose.Types.ObjectId(teknisiId) },
+        ],
+      };
+
+      const now = new Date();
+
+      // Awal hari ini (UTC)
+      const startOfToday = new Date(
+        Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
+      );
+      const endOfToday = new Date(startOfToday.getTime() + 86400000);
+
+      // Awal bulan ini (UTC)
+      const startOfMonth = new Date(
+        Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1),
+      );
+
+      // ── Stat counts ──────────────────────────────────────────────────────
+      const [totalHariIni, totalBulanIni, totalSelesai, totalBelumSelesai] =
+        await Promise.all([
+          WorkOrder.countDocuments({
+            ...matchTeknisi,
+            createdAt: { $gte: startOfToday, $lt: endOfToday },
+          }),
+          WorkOrder.countDocuments({
+            ...matchTeknisi,
+            createdAt: { $gte: startOfMonth },
+          }),
+          WorkOrder.countDocuments({ ...matchTeknisi, status: "selesai" }),
+          WorkOrder.countDocuments({
+            ...matchTeknisi,
+            status: { $nin: ["selesai", "dibatalkan"] },
+          }),
+        ]);
+
+      // ── Grafik Mingguan (7 hari terakhir) ────────────────────────────────
+      const startOf7Days = new Date(startOfToday.getTime() - 6 * 86400000);
+      const weeklyAgg = await WorkOrder.aggregate([
+        {
+          $match: {
+            ...matchTeknisi,
+            createdAt: { $gte: startOf7Days },
+          },
+        },
+        {
+          $group: {
+            _id: {
+              y: { $year: "$createdAt" },
+              m: { $month: "$createdAt" },
+              d: { $dayOfMonth: "$createdAt" },
+            },
+            total: { $sum: 1 },
+            selesai: {
+              $sum: { $cond: [{ $eq: ["$status", "selesai"] }, 1, 0] },
+            },
+          },
+        },
+      ]);
+      const HARI = ["Min", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab"];
+      const grafikMingguan = Array.from({ length: 7 }, (_, i) => {
+        const d = new Date(startOf7Days.getTime() + i * 86400000);
+        const found = weeklyAgg.find(
+          (a) =>
+            a._id.y === d.getUTCFullYear() &&
+            a._id.m === d.getUTCMonth() + 1 &&
+            a._id.d === d.getUTCDate(),
+        );
+        return {
+          label: HARI[d.getUTCDay()],
+          total: found?.total ?? 0,
+          selesai: found?.selesai ?? 0,
+        };
+      });
+
+      // ── Grafik Bulanan (12 bulan tahun berjalan) ─────────────────────────
+      const startOfYear = new Date(Date.UTC(now.getUTCFullYear(), 0, 1));
+      const monthlyAgg = await WorkOrder.aggregate([
+        {
+          $match: {
+            ...matchTeknisi,
+            createdAt: { $gte: startOfYear },
+          },
+        },
+        {
+          $group: {
+            _id: { m: { $month: "$createdAt" } },
+            total: { $sum: 1 },
+            selesai: {
+              $sum: { $cond: [{ $eq: ["$status", "selesai"] }, 1, 0] },
+            },
+          },
+        },
+      ]);
+      const BULAN = [
+        "Jan","Feb","Mar","Apr","Mei","Jun",
+        "Jul","Ags","Sep","Okt","Nov","Des",
+      ];
+      const grafikBulanan = BULAN.map((label, idx) => {
+        const found = monthlyAgg.find((a) => a._id.m === idx + 1);
+        return { label, total: found?.total ?? 0, selesai: found?.selesai ?? 0 };
+      });
+
+      // ── Grafik Tahunan (5 tahun terakhir) ────────────────────────────────
+      const startYear = now.getUTCFullYear() - 4;
+      const startOf5Years = new Date(Date.UTC(startYear, 0, 1));
+      const yearlyAgg = await WorkOrder.aggregate([
+        {
+          $match: {
+            ...matchTeknisi,
+            createdAt: { $gte: startOf5Years },
+          },
+        },
+        {
+          $group: {
+            _id: { y: { $year: "$createdAt" } },
+            total: { $sum: 1 },
+            selesai: {
+              $sum: { $cond: [{ $eq: ["$status", "selesai"] }, 1, 0] },
+            },
+          },
+        },
+      ]);
+      const grafikTahunan = Array.from({ length: 5 }, (_, i) => {
+        const year = startYear + i;
+        const found = yearlyAgg.find((a) => a._id.y === year);
+        return {
+          label: String(year),
+          total: found?.total ?? 0,
+          selesai: found?.selesai ?? 0,
+        };
+      });
+
+      // ── Distribusi Jenis ─────────────────────────────────────────────────
+      const jenisAgg = await WorkOrder.aggregate([
+        { $match: matchTeknisi },
+        { $group: { _id: "$jenisPekerjaan", total: { $sum: 1 } } },
+      ]);
+      const distribusiJenis = jenisAgg.map((a) => ({
+        jenis: a._id as string,
+        total: a.total as number,
+      }));
+
+      return {
+        totalHariIni,
+        totalBulanIni,
+        totalSelesai,
+        totalBelumSelesai,
+        grafikMingguan,
+        grafikBulanan,
+        grafikTahunan,
+        distribusiJenis,
+      };
+    } catch (error) {
+      throw handleError(error, "WorkOrderService.getDashboardStats");
+    }
+  },
+
+  /**
    * Ambil semua work orders berdasarkan ID koneksi data.
    */
   getByKoneksiData: async (
