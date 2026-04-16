@@ -354,6 +354,8 @@ const workOrderTypeDefs = `#graphql
     grafikBulanan: [GrafikDataPoint!]!
     grafikTahunan: [GrafikDataPoint!]!
     distribusiJenis: [DistribusiJenisItem!]!
+    pekerjaanHariIni: [WorkOrder!]!
+    pekerjaanTerakhir: [WorkOrder!]!
   }
 
   type GrafikDataPoint {

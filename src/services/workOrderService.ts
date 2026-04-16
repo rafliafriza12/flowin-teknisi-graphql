@@ -479,12 +479,26 @@ const workOrderService = {
         },
       ]);
       const BULAN = [
-        "Jan","Feb","Mar","Apr","Mei","Jun",
-        "Jul","Ags","Sep","Okt","Nov","Des",
+        "Jan",
+        "Feb",
+        "Mar",
+        "Apr",
+        "Mei",
+        "Jun",
+        "Jul",
+        "Ags",
+        "Sep",
+        "Okt",
+        "Nov",
+        "Des",
       ];
       const grafikBulanan = BULAN.map((label, idx) => {
         const found = monthlyAgg.find((a) => a._id.m === idx + 1);
-        return { label, total: found?.total ?? 0, selesai: found?.selesai ?? 0 };
+        return {
+          label,
+          total: found?.total ?? 0,
+          selesai: found?.selesai ?? 0,
+        };
       });
 
       // ── Grafik Tahunan (5 tahun terakhir) ────────────────────────────────
@@ -527,6 +541,19 @@ const workOrderService = {
         total: a.total as number,
       }));
 
+      // ── Pekerjaan Hari Ini (semua WO dibuat hari ini, populated) ─────────
+      const pekerjaanHariIni = await populateWorkOrder(
+        WorkOrder.find({
+          ...matchTeknisi,
+          createdAt: { $gte: startOfToday, $lt: endOfToday },
+        }).sort({ createdAt: -1 }),
+      );
+
+      // ── Pekerjaan Terakhir (5 WO terbaru, populated) ─────────────────────
+      const pekerjaanTerakhir = await populateWorkOrder(
+        WorkOrder.find(matchTeknisi).sort({ createdAt: -1 }).limit(5),
+      );
+
       return {
         totalHariIni,
         totalBulanIni,
@@ -536,6 +563,8 @@ const workOrderService = {
         grafikBulanan,
         grafikTahunan,
         distribusiJenis,
+        pekerjaanHariIni,
+        pekerjaanTerakhir,
       };
     } catch (error) {
       throw handleError(error, "WorkOrderService.getDashboardStats");
