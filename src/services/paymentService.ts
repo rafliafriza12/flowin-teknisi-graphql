@@ -102,7 +102,6 @@ const paymentService = {
         transaction_details: transactionDetails,
         item_details: itemDetails,
         ...(customerDetails && { customer_details: customerDetails }),
-        enabled_payments: [] as string[],
         callbacks: {
           finish: `${config.frontendUrl}/payment/finish`,
           error: `${config.frontendUrl}/payment/error`,

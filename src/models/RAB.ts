@@ -63,7 +63,7 @@ const rabSchema = new Schema<IRABDocument>(
     // Midtrans: order ID unik per transaksi
     orderId: {
       type: String,
-      unique: true,
+      // unique: true,
       trim: true,
       default: null,
     },

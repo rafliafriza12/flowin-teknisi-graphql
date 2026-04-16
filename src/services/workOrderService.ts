@@ -1351,6 +1351,16 @@ const workOrderService = {
         );
       }
 
+      // Untuk RAB: pastikan totalBiaya sudah diisi sebelum bisa kirimHasil
+      if (wo.jenisPekerjaan === "rab" && refId) {
+        const rab = await RAB.findById(refId).lean();
+        if (!rab || !rab.totalBiaya || rab.totalBiaya <= 0) {
+          throw validationError(
+            "Total biaya RAB belum diisi atau tidak valid. Isi total biaya terlebih dahulu sebelum mengirim hasil.",
+          );
+        }
+      }
+
       wo.status = "dikirim";
       wo.catatanReview = null;
       await wo.save();
@@ -1417,18 +1427,8 @@ const workOrderService = {
 
         // Jika ini pekerjaan RAB → generate payment link otomatis
         if (wo.jenisPekerjaan === "rab" && wo.idRAB) {
-          try {
-            const paymentService = (await import("./paymentService")).default;
-            await paymentService.generatePaymentLink(wo.idRAB.toString());
-          } catch (payErr) {
-            // Jangan gagalkan review jika payment link gagal dibuat
-            // (bisa dicoba ulang nanti via mutation terpisah)
-            console.error(
-              "[reviewHasil] Gagal generate payment link untuk RAB:",
-              wo.idRAB,
-              payErr,
-            );
-          }
+          const paymentService = (await import("./paymentService")).default;
+          await paymentService.generatePaymentLink(wo.idRAB.toString());
         }
 
         // Jika ini pekerjaan penyelesaian_laporan → ubah status Laporan → "Selesai"

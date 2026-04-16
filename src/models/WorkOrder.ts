@@ -87,7 +87,7 @@ export const URUTAN_PEKERJAAN: Record<JenisPekerjaan, JenisPekerjaan[]> = {
   rab: ["survei"],
   pemasangan: ["rab"],
   pengawasan_pemasangan: ["rab"],
-  pengawasan_setelah_pemasangan: ["pemasangan", "pengawasan_pemasangan"],
+  pengawasan_setelah_pemasangan: ["rab"],
   penyelesaian_laporan: [],
 };
 
