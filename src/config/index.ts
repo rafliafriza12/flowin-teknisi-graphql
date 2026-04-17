@@ -38,6 +38,7 @@ function validateEnvVars() {
   //     process.exit(1);
   //   }
   // }
+  // test
 }
 
 validateEnvVars();
