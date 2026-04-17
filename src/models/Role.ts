@@ -6,4 +6,4 @@
  * Tidak ada collection `roles` di MongoDB.
  */
 
-export type RoleName = "Admin" | "Technician" | "User";
+export type RoleName = "admin" | "Technician" | "User";

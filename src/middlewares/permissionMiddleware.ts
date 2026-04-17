@@ -30,7 +30,7 @@ export const isAdmin = async (context: GraphQLContext): Promise<void> => {
   if (!context.user || !context.role) {
     throw authenticationError("Authentication required. Please login.");
   }
-  if (context.role !== "Admin") {
+  if (context.role !== "admin") {
     throw forbiddenError("Access denied.");
   }
 };
@@ -77,7 +77,7 @@ const roleMiddlewareMap: Record<
   RoleName,
   (context: GraphQLContext) => Promise<void>
 > = {
-  Admin: isAdmin,
+  admin: isAdmin,
   Technician: isTechnician,
   User: isUser,
 };

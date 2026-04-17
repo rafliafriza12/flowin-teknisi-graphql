@@ -26,17 +26,17 @@ export const permissions: RoutePermissions = {
     users: "public",
 
     // Work Order Typedef
-    workOrders: ["Admin"],
-    workOrder: ["Admin", "Technician"],
+    workOrders: ["admin"],
+    workOrder: ["admin", "Technician"],
     workOrdersSaya: ["Technician"],
-    workOrdersByKoneksiData: ["Admin", "Technician"],
-    workflowChain: ["Admin", "Technician"],
-    cekPrerequisitePekerjaan: ["Admin"],
+    workOrdersByKoneksiData: ["admin", "Technician"],
+    workflowChain: ["admin", "Technician"],
+    cekPrerequisitePekerjaan: ["admin"],
 
     // Work Order Typedef — Teknisi
-    progresWorkOrder: ["Admin", "Technician"],
-    paymentLinkRAB: ["Admin", "Technician"],
-    laporan: ["Admin", "Technician"],
+    progresWorkOrder: ["admin", "Technician"],
+    paymentLinkRAB: ["admin", "Technician"],
+    laporan: ["admin", "Technician"],
     dashboardStats: ["Technician"],
   },
 
@@ -47,20 +47,20 @@ export const permissions: RoutePermissions = {
     forgotPassword: "public",
     resetPassword: "public",
     logout: ["Technician"],
-    changePassword: ["Admin", "Technician"],
-    register: ["Admin"],
+    changePassword: ["admin", "Technician"],
+    register: ["admin"],
 
     // User Typedef
-    updateUser: ["Admin"],
-    deleteUser: ["Admin"],
-    toggleUserStatus: ["Admin"],
+    updateUser: ["admin"],
+    deleteUser: ["admin"],
+    toggleUserStatus: ["admin"],
 
-    // Work Order Typedef — Admin
-    buatWorkOrder: ["Admin"],
-    reviewTim: ["Admin"],
-    reviewHasil: ["Admin"],
-    reviewPenolakan: ["Admin"],
-    batalkanWorkOrder: ["Admin"],
+    // Work Order Typedef — admin
+    buatWorkOrder: ["admin"],
+    reviewTim: ["admin"],
+    reviewHasil: ["admin"],
+    reviewPenolakan: ["admin"],
+    batalkanWorkOrder: ["admin"],
 
     // Work Order Typedef — Teknisi
     terimaPekerjaan: ["Technician"],
@@ -80,5 +80,5 @@ export const getPermission = (
   type: "Query" | "Mutation",
   operation: string,
 ): PermissionType => {
-  return permissions[type]?.[operation] ?? ["Admin", "Technician", "User"];
+  return permissions[type]?.[operation] ?? ["admin", "Technician", "User"];
 };
