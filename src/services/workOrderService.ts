@@ -226,14 +226,119 @@ const assertPekerjaanDiterima = (wo: IWorkOrderDocument): void => {
 
 /**
  * Populate work order dengan relasi user dan chain.
+ * Sengaja TIDAK populate riwayatRespon.oleh & riwayatReview.oleh via Mongoose
+ * karena field tersebut bisa berisi ID dari dua collection berbeda
+ * (TeknisiPerumdam untuk teknisi, admins untuk admin PDAM).
+ * Resolusi dilakukan manual via resolveRiwayatOleh().
  */
 const populateWorkOrder = (query: mongoose.Query<any, any>) => {
   return query
     .populate("teknisiPenanggungJawab", "-password -accessToken -refreshToken")
     .populate("tim", "-password -accessToken -refreshToken")
-    .populate("riwayatReview.oleh", "-password -accessToken -refreshToken")
-    .populate("riwayatRespon.oleh", "-password -accessToken -refreshToken")
     .populate("workOrderSebelumnya");
+};
+
+/**
+ * Resolve field `oleh` pada riwayatRespon dan riwayatReview secara manual.
+ *
+ * Strategi:
+ * 1. Kumpulkan semua raw ObjectId dari kedua array (sebelum disentuh populate)
+ * 2. Batch-lookup ke collection `TeknisiPerumdam` (users) dan `admins`
+ * 3. Pasangkan hasilnya kembali ke setiap entry
+ *
+ * Harus dipanggil SETELAH fetchWorkOrder tapi sebelum return ke resolver.
+ */
+const resolveRiwayatOleh = async (wo: any): Promise<void> => {
+  if (!wo) return;
+
+  const riwayatAll = [...(wo.riwayatRespon || []), ...(wo.riwayatReview || [])];
+  if (riwayatAll.length === 0) return;
+
+  // Kumpulkan semua raw ObjectId (masih berupa ObjectId karena tidak di-populate)
+  const rawIds: mongoose.Types.ObjectId[] = [];
+  for (const entry of riwayatAll) {
+    const raw = entry.oleh;
+    if (raw && typeof raw !== "object") continue; // sudah populated (tidak mungkin tapi jaga-jaga)
+    if (raw instanceof mongoose.Types.ObjectId) rawIds.push(raw);
+    else if (raw && raw._id) {
+      // Sudah ter-populate oleh Mongoose sebelumnya (edge case)
+    } else if (raw) {
+      try {
+        rawIds.push(new mongoose.Types.ObjectId(String(raw)));
+      } catch {
+        // ID tidak valid, skip
+      }
+    }
+  }
+
+  if (rawIds.length === 0) return;
+
+  const uniqueIds = [
+    ...new Map(rawIds.map((id) => [id.toString(), id])).values(),
+  ];
+
+  // Lookup paralel dari kedua collection
+  const [teknisiDocs, adminDocs] = await Promise.all([
+    User.find({ _id: { $in: uniqueIds } })
+      .select("-password -accessToken -refreshToken")
+      .lean(),
+    (async () => {
+      const db = mongoose.connection.db;
+      if (!db) return [];
+      return db
+        .collection("admins")
+        .find({ _id: { $in: uniqueIds } })
+        .toArray();
+    })(),
+  ]);
+
+  // Buat map id → user shape
+  const userMap = new Map<string, any>();
+
+  for (const u of teknisiDocs) {
+    userMap.set((u as any)._id.toString(), {
+      _id: (u as any)._id,
+      id: (u as any)._id.toString(),
+      namaLengkap: (u as any).namaLengkap,
+      email: (u as any).email,
+      nip: (u as any).nip,
+      noHp: (u as any).noHp,
+      isActive: (u as any).isActive,
+    });
+  }
+
+  for (const a of adminDocs) {
+    const key = (a._id as mongoose.Types.ObjectId).toString();
+    if (!userMap.has(key)) {
+      userMap.set(key, {
+        _id: a._id,
+        id: key,
+        namaLengkap: a.namaLengkap || a.nama || "Admin",
+        email: a.email || "",
+        nip: a.NIP || "-",
+        noHp: a.noHP || "-",
+        isActive: true,
+      });
+    }
+  }
+
+  // Pasangkan kembali ke setiap entry
+  for (const entry of riwayatAll) {
+    const raw = entry.oleh;
+    let key: string | null = null;
+    if (raw instanceof mongoose.Types.ObjectId) {
+      key = raw.toString();
+    } else if (raw && raw.toString) {
+      try {
+        key = new mongoose.Types.ObjectId(String(raw)).toString();
+      } catch {
+        key = null;
+      }
+    }
+    if (key && userMap.has(key)) {
+      entry.oleh = userMap.get(key);
+    }
+  }
 };
 
 /**
@@ -294,6 +399,9 @@ const workOrderService = {
 
       const totalPages = Math.ceil(total / limit);
 
+      // Resolve admin references in riwayat
+      await Promise.all(data.map((wo: any) => resolveRiwayatOleh(wo)));
+
       return {
         data,
         pagination: {
@@ -323,6 +431,7 @@ const workOrderService = {
           "WorkOrder",
         );
       }
+      await resolveRiwayatOleh(wo);
       return wo;
     } catch (error) {
       throw handleError(error, "WorkOrderService.getById");
@@ -359,6 +468,8 @@ const workOrderService = {
       ]);
 
       const totalPages = Math.ceil(total / limit);
+
+      await Promise.all(data.map((wo: any) => resolveRiwayatOleh(wo)));
 
       return {
         data,
@@ -548,10 +659,16 @@ const workOrderService = {
           createdAt: { $gte: startOfToday, $lt: endOfToday },
         }).sort({ createdAt: -1 }),
       );
+      await Promise.all(
+        pekerjaanHariIni.map((wo: any) => resolveRiwayatOleh(wo)),
+      );
 
       // ── Pekerjaan Terakhir (5 WO terbaru, populated) ─────────────────────
       const pekerjaanTerakhir = await populateWorkOrder(
         WorkOrder.find(matchTeknisi).sort({ createdAt: -1 }).limit(5),
+      );
+      await Promise.all(
+        pekerjaanTerakhir.map((wo: any) => resolveRiwayatOleh(wo)),
       );
 
       return {
@@ -582,7 +699,10 @@ const workOrderService = {
 
       return await populateWorkOrder(
         WorkOrder.find({ idKoneksiData }).sort({ createdAt: 1 }),
-      );
+      ).then(async (wos: any[]) => {
+        await Promise.all(wos.map((wo) => resolveRiwayatOleh(wo)));
+        return wos;
+      });
     } catch (error) {
       throw handleError(error, "WorkOrderService.getByKoneksiData");
     }
@@ -617,6 +737,7 @@ const workOrderService = {
       const allWOs = await populateWorkOrder(
         WorkOrder.find({ idKoneksiData }).sort({ createdAt: 1 }),
       );
+      await Promise.all(allWOs.map((wo: any) => resolveRiwayatOleh(wo)));
 
       // Urutan rantai utama (exclude standalone)
       const chainOrder: JenisPekerjaan[] = [
