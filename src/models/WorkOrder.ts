@@ -108,7 +108,7 @@ export const JENIS_KE_REF_FIELD: Record<JenisPekerjaan, string> = {
 export interface IRiwayatReview {
   status: "disetujui" | "ditolak";
   catatan?: string | null;
-  oleh: Types.ObjectId;
+  oleh: string;
   tanggal: Date;
 }
 
@@ -119,7 +119,7 @@ export interface IRiwayatRespon {
     | "penolakan_ditolak"
     | "diterima";
   alasan?: string | null;
-  oleh: Types.ObjectId;
+  oleh: string;
   tanggal: Date;
 }
 
@@ -271,8 +271,7 @@ const workOrderSchema = new Schema<IWorkOrderDocument>(
           default: null,
         },
         oleh: {
-          type: Schema.Types.ObjectId,
-          ref: "TeknisiPerumdam",
+          type: String,
           required: true,
         },
         tanggal: {
@@ -342,8 +341,7 @@ const workOrderSchema = new Schema<IWorkOrderDocument>(
           default: null,
         },
         oleh: {
-          type: Schema.Types.ObjectId,
-          ref: "TeknisiPerumdam",
+          type: String,
           required: true,
         },
         tanggal: {

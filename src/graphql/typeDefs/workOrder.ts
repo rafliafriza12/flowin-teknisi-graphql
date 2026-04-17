@@ -93,14 +93,14 @@ const workOrderTypeDefs = `#graphql
   type RiwayatReview {
     status: String!
     catatan: String
-    oleh: User!
+    oleh: String!
     tanggal: String!
   }
 
   type RiwayatRespon {
     aksi: String!
     alasan: String
-    oleh: User!
+    oleh: String!
     tanggal: String!
   }
 
