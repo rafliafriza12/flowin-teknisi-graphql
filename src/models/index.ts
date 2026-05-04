@@ -37,3 +37,4 @@ export {
   IPenyelesaianLaporan,
   IPenyelesaianLaporanDocument,
 } from "./PenyelesaianLaporan";
+export { Maintenance, IMaintenance, IMaintenanceDocument } from "./Maintenance";

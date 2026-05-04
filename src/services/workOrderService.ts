@@ -11,6 +11,7 @@ import {
   PengawasanPemasangan,
   PengawasanSetelahPemasangan,
   PenyelesaianLaporan,
+  Maintenance,
   URUTAN_PEKERJAAN,
   JENIS_KE_REF_FIELD,
   JenisPekerjaan,
@@ -65,6 +66,7 @@ export interface BuatWorkOrderInput {
   jenisPekerjaan: JenisPekerjaan;
   teknisiPenanggungJawab: string;
   idLaporan?: string | null;
+  koordinatLokasi?: { longitude: number; latitude: number } | null;
 }
 
 export interface TerimaPekerjaanInput {
@@ -246,6 +248,7 @@ const getRefModel = (jenisPekerjaan: JenisPekerjaan) => {
     pengawasan_pemasangan: PengawasanPemasangan,
     pengawasan_setelah_pemasangan: PengawasanSetelahPemasangan,
     penyelesaian_laporan: PenyelesaianLaporan,
+    maintenance: Maintenance,
   };
   return modelMap[jenisPekerjaan];
 };
@@ -631,6 +634,7 @@ const workOrderService = {
       const allStages: JenisPekerjaan[] = [
         ...chainOrder,
         "penyelesaian_laporan",
+        "maintenance",
       ];
 
       const result: {
@@ -836,7 +840,7 @@ const workOrderService = {
       // Validasi input IDs
       validateId(input.teknisiPenanggungJawab, "teknisiPenanggungJawab");
 
-      // Untuk penyelesaian_laporan: idKoneksiData tidak wajib
+      // Para penyelesaian_laporan: idKoneksiData tidak wajib
       if (input.jenisPekerjaan !== "penyelesaian_laporan") {
         validateId(input.idKoneksiData, "idKoneksiData");
       }
@@ -908,6 +912,9 @@ const workOrderService = {
         riwayatReview: [],
         riwayatRespon: [],
         ...(input.idLaporan ? { idLaporan: input.idLaporan } : {}),
+        ...(input.koordinatLokasi
+          ? { koordinatLokasi: input.koordinatLokasi }
+          : {}),
       });
 
       await wo.save();
@@ -1448,6 +1455,11 @@ const workOrderService = {
 
         // Set foreign key berdasarkan jenis pekerjaan
         if (["survei", "rab", "pemasangan"].includes(wo.jenisPekerjaan)) {
+          createData.idKoneksiData = wo.idKoneksiData;
+        }
+
+        // Untuk maintenance: set idKoneksiData
+        if (wo.jenisPekerjaan === "maintenance") {
           createData.idKoneksiData = wo.idKoneksiData;
         }
 

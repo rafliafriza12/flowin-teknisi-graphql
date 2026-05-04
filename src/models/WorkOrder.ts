@@ -19,6 +19,7 @@ export const JENIS_PEKERJAAN = [
   "pengawasan_pemasangan",
   "pengawasan_setelah_pemasangan",
   "penyelesaian_laporan",
+  "maintenance",
 ] as const;
 
 export type JenisPekerjaan = (typeof JENIS_PEKERJAAN)[number];
@@ -89,6 +90,7 @@ export const URUTAN_PEKERJAAN: Record<JenisPekerjaan, JenisPekerjaan[]> = {
   pengawasan_pemasangan: ["rab"],
   pengawasan_setelah_pemasangan: ["rab"],
   penyelesaian_laporan: [],
+  maintenance: [],
 };
 
 /**
@@ -101,6 +103,7 @@ export const JENIS_KE_REF_FIELD: Record<JenisPekerjaan, string> = {
   pengawasan_pemasangan: "idPengawasanPemasangan",
   pengawasan_setelah_pemasangan: "idPengawasanSetelahPemasangan",
   penyelesaian_laporan: "idPenyelesaianLaporan",
+  maintenance: "idMaintenance",
 };
 
 // ─── Interface ────────────────────────────────────────────────────────────────
@@ -150,8 +153,11 @@ export interface IWorkOrder {
   idPengawasanPemasangan?: Types.ObjectId | null;
   idPengawasanSetelahPemasangan?: Types.ObjectId | null;
   idPenyelesaianLaporan?: Types.ObjectId | null;
+  idMaintenance?: Types.ObjectId | null;
   // Referensi laporan asal (hanya untuk jenis penyelesaian_laporan)
   idLaporan?: Types.ObjectId | null;
+  // Koordinat lokasi pekerjaan (diset admin, dipakai teknisi untuk navigasi rute)
+  koordinatLokasi?: { longitude: number; latitude: number } | null;
   // Review
   catatanReview?: string | null;
   riwayatReview: IRiwayatReview[];
@@ -313,12 +319,27 @@ const workOrderSchema = new Schema<IWorkOrderDocument>(
       default: null,
     },
 
+    idMaintenance: {
+      type: Schema.Types.ObjectId,
+      ref: "Maintenance",
+      default: null,
+    },
+
     // Referensi laporan asal (hanya terisi untuk jenis penyelesaian_laporan)
     // Collection "laporans" dikelola secara terpisah (tidak ada Mongoose model lokal)
     idLaporan: {
       type: Schema.Types.ObjectId,
       default: null,
       index: true,
+    },
+
+    // Koordinat lokasi pekerjaan (diset admin saat membuat WO maintenance)
+    koordinatLokasi: {
+      type: {
+        longitude: { type: Number, required: true },
+        latitude: { type: Number, required: true },
+      },
+      default: null,
     },
 
     // ─── Review ────────────────────────────────────────────────────────

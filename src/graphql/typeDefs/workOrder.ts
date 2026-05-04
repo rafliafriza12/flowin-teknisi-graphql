@@ -9,6 +9,17 @@ const workOrderTypeDefs = `#graphql
     pengawasan_pemasangan
     pengawasan_setelah_pemasangan
     penyelesaian_laporan
+    maintenance
+  }
+
+  enum KondisiDaya {
+    menyala
+    mati
+  }
+
+  enum KondisiKoneksi {
+    terkoneksi
+    tidak_terkoneksi
   }
 
   enum StatusPekerjaan {
@@ -131,8 +142,11 @@ const workOrderTypeDefs = `#graphql
     idPengawasanPemasangan: ID
     idPengawasanSetelahPemasangan: ID
     idPenyelesaianLaporan: ID
+    idMaintenance: ID
     "Referensi laporan asal (hanya untuk penyelesaian_laporan)"
     idLaporan: ID
+    "Koordinat lokasi pekerjaan (diset admin, untuk navigasi rute teknisi)"
+    koordinatLokasi: KoordinatLokasi
     # ─── Review ─────────────────────────────────────────────
     catatanReview: String
     riwayatReview: [RiwayatReview!]!
@@ -176,6 +190,12 @@ const workOrderTypeDefs = `#graphql
     latitude: Float!
   }
 
+  "Koordinat lokasi pekerjaan yang diset oleh admin (untuk navigasi rute teknisi)"
+  type KoordinatLokasi {
+    longitude: Float!
+    latitude: Float!
+  }
+
   "Data progres pekerjaan yang sudah tersimpan, digunakan untuk pre-fill form saat revisi"
   type ProgresData {
     jenisPekerjaan: JenisPekerjaan!
@@ -194,6 +214,13 @@ const workOrderTypeDefs = `#graphql
     fotoMeteranDanRumah: String
     urlGambar: [String!]
     catatan: String
+    # ─── Maintenance ───────────────────────────────
+    kondisiSebelumDaya: KondisiDaya
+    kondisiSebelumKoneksi: KondisiKoneksi
+    fotoSebelum: [String!]
+    kondisiSetelahDaya: KondisiDaya
+    kondisiSetelahKoneksi: KondisiKoneksi
+    fotoSetelah: [String!]
   }
 
   # ─── Inputs ─────────────────────────────────────────────────────────────
@@ -204,6 +231,13 @@ const workOrderTypeDefs = `#graphql
     teknisiPenanggungJawab: ID!
     "Wajib diisi jika jenisPekerjaan adalah penyelesaian_laporan"
     idLaporan: ID
+    "Koordinat lokasi pekerjaan (wajib untuk maintenance)"
+    koordinatLokasi: KoordinatLokasiInput
+  }
+
+  input KoordinatLokasiInput {
+    longitude: Float!
+    latitude: Float!
   }
 
   input AjukanTimInput {
