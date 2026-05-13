@@ -4,6 +4,7 @@ import userService from "./userService";
 import workOrderService from "./workOrderService";
 import paymentService from "./paymentService";
 import laporanService from "./laporanService";
+// push notifications removed - replaced by email notifications
 
 const services = {
   authService,
@@ -12,6 +13,7 @@ const services = {
   workOrderService,
   paymentService,
   laporanService,
+  // pushNotificationService removed
 };
 
 export default services;

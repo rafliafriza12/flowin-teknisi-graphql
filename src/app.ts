@@ -74,6 +74,8 @@ const createExpressMiddleware = <TContext extends GraphQLContext>(
 export const startApolloServer = async () => {
   await apolloServer.start();
 
+  // Web Push removed — no VAPID initialisation
+
   app.use(
     cors({
       origin: config.corsOrigin,

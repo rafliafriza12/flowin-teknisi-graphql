@@ -3,7 +3,6 @@ import {
   WorkOrder,
   IWorkOrderDocument,
   User,
-  IUserDocument,
   DataConnection,
   Survey,
   RAB,
@@ -30,6 +29,7 @@ import {
   badUserInputError,
 } from "../utils/errors";
 import { verifyPayloadSignature } from "../utils/signatureHash";
+import emailService from "./emailService";
 
 // ─── Raw collection helper: Laporan ──────────────────────────────────────────
 // Collection "laporans" dikelola oleh aplikasi mobile/pelanggan, tidak ada
@@ -924,8 +924,18 @@ const workOrderService = {
         await updateLaporanStatus(input.idLaporan, "ProsesPerbaikan");
       }
 
-      // TIDAK update pekerjaanSekarang di sini.
-      // pekerjaanSekarang baru di-set saat teknisi MENERIMA pekerjaan.
+      // Kirim email ke teknisi penanggung jawab
+      try {
+        if (teknisi.email) {
+          const subject = "Work Order Baru";
+          const html = `<p>Anda mendapat tugas pekerjaan baru: <strong>${input.jenisPekerjaan.replace(/_/g, " ")}</strong></p>
+            <p>Work Order ID: ${wo._id.toString()}</p>`;
+          await emailService.sendMail({ to: teknisi.email, subject, html });
+        }
+      } catch (e) {
+        // non-blocking
+        console.error("Failed to send new work order email:", e);
+      }
 
       return await workOrderService.getById(wo._id.toString());
     } catch (error) {
@@ -1150,6 +1160,27 @@ const workOrderService = {
 
       await wo.save();
 
+      // Kirim email ke teknisi penanggung jawab tentang hasil review penolakan
+      try {
+        const teknisi = await User.findById(wo.teknisiPenanggungJawab).lean();
+        if (teknisi && teknisi.email) {
+          if (input.disetujui) {
+            const subject = "Penolakan Diterima — Work Order Dibatalkan";
+            const html = `<p>Penolakan pekerjaan Anda telah <strong>diterima</strong>. Work order dibatalkan.</p>
+              <p>Work Order ID: ${input.workOrderId}</p>`;
+            await emailService.sendMail({ to: teknisi.email, subject, html });
+          } else {
+            const subject = "Penolakan Ditolak — Mohon Terima Pekerjaan";
+            const html = `<p>Penolakan Anda <strong>ditolak</strong> oleh admin. Anda wajib menerima pekerjaan ini.</p>
+              <p>Catatan: ${input.catatan?.trim()}</p>
+              <p>Work Order ID: ${input.workOrderId}</p>`;
+            await emailService.sendMail({ to: teknisi.email, subject, html });
+          }
+        }
+      } catch (e) {
+        console.error("Failed to send penolakan review email:", e);
+      }
+
       return await workOrderService.getById(wo._id.toString());
     } catch (error) {
       throw handleError(error, "WorkOrderService.reviewPenolakan");
@@ -1361,12 +1392,31 @@ const workOrderService = {
 
       await wo.save();
 
+      // Kirim email ke teknisi penanggung jawab tentang hasil review tim
+      try {
+        const teknisi = await User.findById(wo.teknisiPenanggungJawab).lean();
+        if (teknisi && teknisi.email) {
+          if (input.disetujui) {
+            const subject = "Tim Disetujui — Work Order";
+            const html = `<p>Pengajuan tim Anda telah <strong>disetujui</strong>. Pekerjaan siap dikerjakan.</p>
+              <p>Work Order ID: ${input.workOrderId}</p>`;
+            await emailService.sendMail({ to: teknisi.email, subject, html });
+          } else {
+            const subject = "Tim Ditolak — Work Order";
+            const html = `<p>Pengajuan tim Anda <strong>ditolak</strong>. Catatan: ${input.catatan?.trim()}</p>
+              <p>Work Order ID: ${input.workOrderId}</p>`;
+            await emailService.sendMail({ to: teknisi.email, subject, html });
+          }
+        }
+      } catch (e) {
+        console.error("Failed to send team review email:", e);
+      }
+
       return await workOrderService.getById(wo._id.toString());
     } catch (error) {
       throw handleError(error, "WorkOrderService.reviewTim");
     }
   },
-
   /**
    * [TEKNISI] Simpan progres pekerjaan (draft).
    *
@@ -1655,6 +1705,26 @@ const workOrderService = {
       wo.riwayatReview.push(reviewEntry);
       await wo.save();
 
+      // Kirim email ke teknisi penanggung jawab tentang hasil review pekerjaan
+      try {
+        const teknisi = await User.findById(wo.teknisiPenanggungJawab).lean();
+        if (teknisi && teknisi.email) {
+          if (input.disetujui) {
+            const subject = "Pekerjaan Selesai — Work Order";
+            const html = `<p>Hasil pekerjaan Anda telah <strong>disetujui</strong>. Pekerjaan dinyatakan selesai.</p>
+              <p>Work Order ID: ${input.workOrderId}</p>`;
+            await emailService.sendMail({ to: teknisi.email, subject, html });
+          } else {
+            const subject = "Perlu Revisi — Work Order";
+            const html = `<p>Hasil pekerjaan Anda <strong>perlu direvisi</strong>. Catatan: ${input.catatan?.trim()}</p>
+              <p>Work Order ID: ${input.workOrderId}</p>`;
+            await emailService.sendMail({ to: teknisi.email, subject, html });
+          }
+        }
+      } catch (e) {
+        console.error("Failed to send review result email:", e);
+      }
+
       return await workOrderService.getById(wo._id.toString());
     } catch (error) {
       throw handleError(error, "WorkOrderService.reviewHasil");
@@ -1711,6 +1781,23 @@ const workOrderService = {
       // Jika penyelesaian_laporan dibatalkan → kembalikan status Laporan → "Diajukan"
       if (wo.jenisPekerjaan === "penyelesaian_laporan" && wo.idLaporan) {
         await updateLaporanStatus(wo.idLaporan, "Diajukan");
+      }
+
+      // Kirim email ke teknisi penanggung jawab bahwa work order dibatalkan
+      try {
+        const teknisi = await User.findById(wo.teknisiPenanggungJawab).lean();
+        if (teknisi && teknisi.email) {
+          const subject = "Work Order Dibatalkan";
+          const html = `<p>${
+            catatan
+              ? `Work order Anda telah dibatalkan. Catatan: ${catatan.trim()}`
+              : "Work order Anda telah dibatalkan oleh admin."
+          }</p>
+            <p>Work Order ID: ${id}</p>`;
+          await emailService.sendMail({ to: teknisi.email, subject, html });
+        }
+      } catch (e) {
+        console.error("Failed to send cancellation email:", e);
       }
 
       return {
