@@ -27,7 +27,7 @@ const maintenanceSchema = new Schema<IMaintenanceDocument>(
       type: Schema.Types.ObjectId,
       ref: "KoneksiData",
       required: [true, "ID koneksi data diperlukan"],
-      index: true,
+      // index: true,
     },
 
     kondisiSebelumDaya: {
